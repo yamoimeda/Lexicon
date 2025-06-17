@@ -42,7 +42,7 @@ export default function GamePage() {
   // Mock game state
   const [currentRound, setCurrentRound] = useState(1);
   const [totalRounds, setTotalRounds] = useState(3);
-  const [letters, setLetters] = useState("A B C D E F G"); // Example letters
+  const [letters, setLetters] = useState("A"); // Example single letter
   const [timeLeft, setTimeLeft] = useState(60); // seconds
   const [categories, setCategories] = useState<string[]>(["Animals", "Countries", "Fruits"]);
   const [words, setWords] = useState<CategoryWord[]>(
@@ -72,14 +72,11 @@ export default function GamePage() {
     }
   }, [timeLeft]);
   
-  // Function to generate random letters (simple version)
+  // Function to generate a single random letter
   useEffect(() => {
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    let randomLetters = "";
-    for (let i = 0; i < 7; i++) {
-      randomLetters += alphabet[Math.floor(Math.random() * alphabet.length)] + (i < 6 ? " " : "");
-    }
-    setLetters(randomLetters);
+    const randomLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
+    setLetters(randomLetter);
   }, [currentRound]);
 
 
@@ -119,7 +116,9 @@ export default function GamePage() {
   const handleSuggestWords = async (category: string) => {
     setWords(prevWords => prevWords.map(cw => cw.category === category ? {...cw, isLoading: true} : cw));
     try {
-      const input: SuggestValidWordsInput = { letters: letters.replace(/\s/g, ''), category, language: "English", numberOfSuggestions: 1 };
+      // The AI flow for suggestions might need adjustment if it strictly expects multiple letters.
+      // For now, we pass the single letter. The prompt might need to be more generic for "given letter(s)".
+      const input: SuggestValidWordsInput = { letters: letters, category, language: "English", numberOfSuggestions: 1 };
       const result = await suggestValidWords(input);
       if (result.suggestions && result.suggestions.length > 0) {
         toast({
@@ -129,7 +128,7 @@ export default function GamePage() {
         // Optionally fill the input:
         // handleWordChange(category, result.suggestions[0]);
       } else {
-        toast({title: "No suggestions found", description: `Could not find a suggestion for ${category} with these letters.`});
+        toast({title: "No suggestions found", description: `Could not find a suggestion for ${category} with the letter "${letters}".`});
       }
     } catch (error) {
       console.error("Suggestion error:", error);
@@ -186,7 +185,7 @@ export default function GamePage() {
             </CardHeader>
             <CardContent>
               <div className="text-center mb-6 p-4 bg-primary/10 rounded-lg">
-                <p className="text-sm text-primary font-medium mb-1">Your Letters:</p>
+                <p className="text-sm text-primary font-medium mb-1">Your Letter:</p>
                 <p className="text-4xl font-headline font-bold tracking-widest text-primary">{letters}</p>
               </div>
               
@@ -256,3 +255,4 @@ export default function GamePage() {
     </PageWrapper>
   );
 }
+
