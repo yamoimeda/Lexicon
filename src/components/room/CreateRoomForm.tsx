@@ -13,37 +13,75 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { PlusCircle, Settings, Languages, Users, Clock, ListOrdered } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-// This would typically be stored in a global state / context or persisted
 interface RoomSettings {
   roomName: string;
   numberOfRounds: number;
   timePerRound: number; // in seconds
   categories: string; // Comma-separated string
   language: string;
-  // endMode: 'rounds' | 'score'; // Example, not fully implemented
-  // targetScore?: number; // Example, not fully implemented
-  // scoringSystem: 'letters' | 'word'; // Example, not fully implemented
 }
 
-// Helper to generate a simple room ID
+const translations = {
+  en: {
+    customizeTitle: "Customize Your Game",
+    customizeDescription: "Set the rules for your WordDuel!",
+    roomNameLabel: "Room Name",
+    roundsLabel: "Number of Rounds",
+    timePerRoundLabel: "Time Per Round (seconds)",
+    categoriesLabel: "Categories (comma-separated)",
+    categoriesDescription: "Enter a list of categories for players to find words for.",
+    languageLabel: "Language",
+    selectLanguagePlaceholder: "Select language",
+    english: "English",
+    spanish: "Español (Spanish)",
+    french: "Français (French)",
+    german: "Deutsch (German)",
+    createRoomButton: "Create Room",
+    toastRoomCreatedTitle: "Room Created!",
+    toastRoomCreatedDescription: (roomName: string, roomId: string) => `Room ${roomName} (ID: ${roomId}) is ready.`,
+    toastCreationFailedTitle: "Failed to create room",
+    toastCreationFailedDescription: "Could not save room settings locally. Please try again.",
+  },
+  es: {
+    customizeTitle: "Personaliza Tu Juego",
+    customizeDescription: "¡Establece las reglas para tu WordDuel!",
+    roomNameLabel: "Nombre de la Sala",
+    roundsLabel: "Número de Rondas",
+    timePerRoundLabel: "Tiempo por Ronda (segundos)",
+    categoriesLabel: "Categorías (separadas por coma)",
+    categoriesDescription: "Ingresa una lista de categorías para que los jugadores encuentren palabras.",
+    languageLabel: "Idioma",
+    selectLanguagePlaceholder: "Seleccionar idioma",
+    english: "Inglés (English)",
+    spanish: "Español",
+    french: "Francés (French)",
+    german: "Alemán (German)",
+    createRoomButton: "Crear Sala",
+    toastRoomCreatedTitle: "¡Sala Creada!",
+    toastRoomCreatedDescription: (roomName: string, roomId: string) => `La sala ${roomName} (ID: ${roomId}) está lista.`,
+    toastCreationFailedTitle: "Error al crear la sala",
+    toastCreationFailedDescription: "No se pudieron guardar los ajustes de la sala localmente. Por favor, inténtalo de nuevo.",
+  }
+};
+
 const generateRoomId = () => Math.random().toString(36).substring(2, 8).toUpperCase();
 
 export default function CreateRoomForm() {
   const router = useRouter();
-  const { username } = useUser();
+  const { username, language: userLanguage } = useUser(); // Use userLanguage for UI, settings.language for game setting
   const { toast } = useToast();
+  const T = translations[userLanguage as keyof typeof translations] || translations.en;
   
   const [settings, setSettings] = useState<RoomSettings>({
     roomName: `${username}'s Game`,
     numberOfRounds: 3,
     timePerRound: 60,
     categories: "Animals, Countries, Fruits, Colors, Sports",
-    language: 'English',
+    language: 'English', // This is the game's content language, not UI language
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
-    // @ts-ignore
     const val = type === 'number' ? parseInt(value, 10) : value;
     setSettings(prev => ({ ...prev, [name]: val }));
   };
@@ -55,22 +93,19 @@ export default function CreateRoomForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const roomId = generateRoomId();
-    // Here, you would typically save the room settings to a backend or global state.
-    // For this scaffold, we'll simulate by navigating.
-    // Store settings in localStorage for the lobby page to pick up (simplified).
     try {
-      localStorage.setItem(`room-${roomId}-settings`, JSON.stringify({...settings, admin: username}));
-      localStorage.setItem(`room-${roomId}-players`, JSON.stringify([{id: "1", name: username, score: 0}])); // Mock player list
+      localStorage.setItem(`room-${roomId}-settings`, JSON.stringify({...settings, admin: username, gameLanguage: settings.language}));
+      localStorage.setItem(`room-${roomId}-players`, JSON.stringify([{id: "1", name: username, score: 0}])); 
       toast({
-        title: "Room Created!",
-        description: `Room ${settings.roomName} (ID: ${roomId}) is ready.`,
+        title: T.toastRoomCreatedTitle,
+        description: T.toastRoomCreatedDescription(settings.roomName, roomId),
       });
       router.push(`/rooms/${roomId}/lobby`);
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "Failed to create room",
-        description: "Could not save room settings locally. Please try again.",
+        title: T.toastCreationFailedTitle,
+        description: T.toastCreationFailedDescription,
       });
       console.error("Error saving room settings to localStorage:", error);
     }
@@ -79,29 +114,29 @@ export default function CreateRoomForm() {
   return (
     <Card className="w-full shadow-xl">
       <CardHeader>
-        <CardTitle className="text-2xl font-headline text-primary flex items-center"><Settings className="mr-2" />Customize Your Game</CardTitle>
-        <CardDescription>Set the rules for your WordDuel!</CardDescription>
+        <CardTitle className="text-2xl font-headline text-primary flex items-center"><Settings className="mr-2" />{T.customizeTitle}</CardTitle>
+        <CardDescription>{T.customizeDescription}</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-6">
           <div>
-            <Label htmlFor="roomName" className="font-semibold">Room Name</Label>
+            <Label htmlFor="roomName" className="font-semibold">{T.roomNameLabel}</Label>
             <Input id="roomName" name="roomName" value={settings.roomName} onChange={handleChange} required className="mt-1"/>
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
             <div>
-              <Label htmlFor="numberOfRounds" className="font-semibold flex items-center"><ListOrdered className="mr-2 h-4 w-4 text-muted-foreground"/>Number of Rounds</Label>
+              <Label htmlFor="numberOfRounds" className="font-semibold flex items-center"><ListOrdered className="mr-2 h-4 w-4 text-muted-foreground"/>{T.roundsLabel}</Label>
               <Input id="numberOfRounds" name="numberOfRounds" type="number" min="1" max="10" value={settings.numberOfRounds} onChange={handleChange} required className="mt-1"/>
             </div>
             <div>
-              <Label htmlFor="timePerRound" className="font-semibold flex items-center"><Clock className="mr-2 h-4 w-4 text-muted-foreground"/>Time Per Round (seconds)</Label>
+              <Label htmlFor="timePerRound" className="font-semibold flex items-center"><Clock className="mr-2 h-4 w-4 text-muted-foreground"/>{T.timePerRoundLabel}</Label>
               <Input id="timePerRound" name="timePerRound" type="number" min="30" max="180" step="10" value={settings.timePerRound} onChange={handleChange} required className="mt-1"/>
             </div>
           </div>
           
           <div>
-            <Label htmlFor="categories" className="font-semibold">Categories (comma-separated)</Label>
+            <Label htmlFor="categories" className="font-semibold">{T.categoriesLabel}</Label>
             <Input 
               id="categories" 
               name="categories" 
@@ -111,43 +146,29 @@ export default function CreateRoomForm() {
               required 
               className="mt-1"
             />
-            <p className="text-xs text-muted-foreground mt-1">Enter a list of categories for players to find words for.</p>
+            <p className="text-xs text-muted-foreground mt-1">{T.categoriesDescription}</p>
           </div>
 
           <div>
-            <Label htmlFor="language" className="font-semibold flex items-center"><Languages className="mr-2 h-4 w-4 text-muted-foreground"/>Language</Label>
+            <Label htmlFor="language" className="font-semibold flex items-center"><Languages className="mr-2 h-4 w-4 text-muted-foreground"/>{T.languageLabel} (Game Content)</Label>
             <Select name="language" value={settings.language} onValueChange={(value) => handleSelectChange('language', value)}>
               <SelectTrigger className="w-full mt-1">
-                <SelectValue placeholder="Select language" />
+                <SelectValue placeholder={T.selectLanguagePlaceholder} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="English">English</SelectItem>
-                <SelectItem value="Spanish">Español (Spanish)</SelectItem>
-                <SelectItem value="French">Français (French)</SelectItem>
-                <SelectItem value="German">Deutsch (German)</SelectItem>
-                {/* Add more languages as needed */}
+                <SelectItem value="English">{T.english}</SelectItem>
+                <SelectItem value="Spanish">{T.spanish}</SelectItem>
+                <SelectItem value="French">{T.french}</SelectItem>
+                <SelectItem value="German">{T.german}</SelectItem>
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground mt-1">This sets the language for word validation and suggestions during the game.</p>
           </div>
-
-          {/* Placeholder for more advanced settings if needed later
-          <div className="space-y-2">
-            <Label className="font-semibold">Advanced Settings (Optional)</Label>
-            <div className="flex items-center space-x-2">
-              <Checkbox id="customEndMode" />
-              <Label htmlFor="customEndMode">Specific end condition (e.g., first to X points)</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox id="customScoring" />
-              <Label htmlFor="customScoring">Custom scoring system</Label>
-            </div>
-          </div>
-          */}
 
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-3">
-            <PlusCircle className="mr-2" /> Create Room
+            <PlusCircle className="mr-2" /> {T.createRoomButton}
           </Button>
         </CardFooter>
       </form>

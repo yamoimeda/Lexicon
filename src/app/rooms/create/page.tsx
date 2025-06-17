@@ -5,11 +5,21 @@ import React, { useEffect } from 'react';
 import PageWrapper from '@/components/layout/PageWrapper';
 import { useUser } from '@/contexts/UserContext';
 import { useRouter } from 'next/navigation';
-import CreateRoomForm from '@/components/room/CreateRoomForm'; // Will be created later
+import CreateRoomForm from '@/components/room/CreateRoomForm';
+
+const translations = {
+  en: {
+    pageTitle: "Create New Game Room",
+  },
+  es: {
+    pageTitle: "Crear Nueva Sala de Juego",
+  }
+};
 
 export default function CreateRoomPage() {
-  const { isAuthenticated } = useUser();
+  const { isAuthenticated, language } = useUser();
   const router = useRouter();
+  const T = translations[language as keyof typeof translations] || translations.en;
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -24,8 +34,7 @@ export default function CreateRoomPage() {
   return (
     <PageWrapper>
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-4xl font-headline font-bold text-primary mb-8 text-center">Create New Game Room</h1>
-        {/* CreateRoomForm will be implemented in a future step */}
+        <h1 className="text-4xl font-headline font-bold text-primary mb-8 text-center">{T.pageTitle}</h1>
         <CreateRoomForm />
       </div>
     </PageWrapper>

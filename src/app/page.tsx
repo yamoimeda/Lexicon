@@ -12,10 +12,42 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowRight, PlusCircle, Users } from 'lucide-react';
 
+const translations = {
+  en: {
+    loading: "Loading...",
+    welcome: "Welcome, ",
+    readyToDuel: "Ready to duel with words?",
+    createRoomTitle: "Create a New Room",
+    createRoomDescription: "Set up your own game and invite friends.",
+    createRoomContent: "Customize rounds, categories, time limits, and more. Be the master of your WordDuel arena!",
+    createRoomButton: "Create Room",
+    joinRoomTitle: "Join a Room",
+    joinRoomDescription: "Enter a Room ID to join an existing game.",
+    roomIdLabel: "Room ID",
+    roomIdPlaceholder: "Enter Room ID",
+    joinRoomButton: "Join Room",
+  },
+  es: {
+    loading: "Cargando...",
+    welcome: "¡Bienvenido, ",
+    readyToDuel: "¿Listo para un duelo de palabras?",
+    createRoomTitle: "Crear Nueva Sala",
+    createRoomDescription: "Configura tu propio juego e invita amigos.",
+    createRoomContent: "Personaliza rondas, categorías, límites de tiempo y más. ¡Sé el maestro de tu arena WordDuel!",
+    createRoomButton: "Crear Sala",
+    joinRoomTitle: "Unirse a una Sala",
+    joinRoomDescription: "Ingresa un ID de sala para unirte a un juego existente.",
+    roomIdLabel: "ID de Sala",
+    roomIdPlaceholder: "Ingresa el ID de la Sala",
+    joinRoomButton: "Unirse a Sala",
+  }
+};
+
 export default function HomePage() {
-  const { username, isAuthenticated } = useUser();
+  const { username, isAuthenticated, language } = useUser();
   const router = useRouter();
   const [roomIdToJoin, setRoomIdToJoin] = useState('');
+  const T = translations[language as keyof typeof translations] || translations.en;
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -27,7 +59,7 @@ export default function HomePage() {
     return (
       <PageWrapper>
         <div className="flex justify-center items-center h-full">
-          <p>Loading...</p> {/* Or a spinner component */}
+          <p>{T.loading}</p>
         </div>
       </PageWrapper>
     );
@@ -44,9 +76,9 @@ export default function HomePage() {
     <PageWrapper>
       <div className="text-center mb-12">
         <h1 className="text-5xl font-headline font-bold text-primary mb-4">
-          Welcome, <span className="text-accent">{username}!</span>
+          {T.welcome}<span className="text-accent">{username}!</span>
         </h1>
-        <p className="text-xl text-foreground/80">Ready to duel with words?</p>
+        <p className="text-xl text-foreground/80">{T.readyToDuel}</p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
@@ -54,17 +86,17 @@ export default function HomePage() {
           <CardHeader>
             <CardTitle className="font-headline text-2xl text-primary flex items-center">
               <PlusCircle className="mr-2 text-primary" />
-              Create a New Room
+              {T.createRoomTitle}
             </CardTitle>
-            <CardDescription>Set up your own game and invite friends.</CardDescription>
+            <CardDescription>{T.createRoomDescription}</CardDescription>
           </CardHeader>
           <CardContent>
-            <p>Customize rounds, categories, time limits, and more. Be the master of your WordDuel arena!</p>
+            <p>{T.createRoomContent}</p>
           </CardContent>
           <CardFooter>
             <Button asChild className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
               <Link href="/rooms/create">
-                Create Room
+                {T.createRoomButton}
                 <ArrowRight className="ml-2" size={18} />
               </Link>
             </Button>
@@ -75,25 +107,25 @@ export default function HomePage() {
           <CardHeader>
             <CardTitle className="font-headline text-2xl text-primary flex items-center">
               <Users className="mr-2 text-primary" />
-              Join a Room
+              {T.joinRoomTitle}
             </CardTitle>
-            <CardDescription>Enter a Room ID to join an existing game.</CardDescription>
+            <CardDescription>{T.joinRoomDescription}</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleJoinRoom} className="space-y-4">
               <div>
-                <Label htmlFor="roomId" className="text-foreground/80">Room ID</Label>
+                <Label htmlFor="roomId" className="text-foreground/80">{T.roomIdLabel}</Label>
                 <Input
                   id="roomId"
                   type="text"
                   value={roomIdToJoin}
                   onChange={(e) => setRoomIdToJoin(e.target.value)}
-                  placeholder="Enter Room ID"
+                  placeholder={T.roomIdPlaceholder}
                   className="bg-input border-border focus:ring-primary"
                 />
               </div>
               <Button type="submit" className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground" disabled={!roomIdToJoin.trim()}>
-                Join Room
+                {T.joinRoomButton}
                 <ArrowRight className="ml-2" size={18} />
               </Button>
             </form>

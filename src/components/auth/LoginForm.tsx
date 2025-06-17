@@ -8,9 +8,23 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { LogIn } from 'lucide-react';
 
+const translations = {
+  en: {
+    usernameLabel: "Username",
+    usernamePlaceholder: "Enter your username",
+    enterGameButton: "Enter Game",
+  },
+  es: {
+    usernameLabel: "Nombre de usuario",
+    usernamePlaceholder: "Ingresa tu nombre de usuario",
+    enterGameButton: "Entrar al Juego",
+  }
+};
+
 export default function LoginForm() {
   const [name, setName] = useState('');
-  const { login } = useUser();
+  const { login, language } = useUser();
+  const T = translations[language as keyof typeof translations] || translations.en;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,20 +36,20 @@ export default function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="username" className="text-foreground/80">Username</Label>
+        <Label htmlFor="username" className="text-foreground/80">{T.usernameLabel}</Label>
         <Input
           id="username"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Enter your username"
+          placeholder={T.usernamePlaceholder}
           required
           className="bg-input border-border focus:ring-primary"
         />
       </div>
       <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" disabled={!name.trim()}>
         <LogIn size={18} className="mr-2" />
-        Enter Game
+        {T.enterGameButton}
       </Button>
     </form>
   );
