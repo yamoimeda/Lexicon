@@ -41,7 +41,7 @@ interface DisplayRoomDetails {
 
 const translations = {
   en: {
-    lobbyTitle: "Lobby: ",
+    lobbyTitle: "Lobby ID: ",
     lobbyDescription: "Get ready for the duel! Waiting for the admin to start.",
     gameSettingsTitle: "Game Settings",
     rounds: "Rounds:",
@@ -64,7 +64,7 @@ const translations = {
     playerCount: (count: number) => `(${count})`,
   },
   es: {
-    lobbyTitle: "Sala de Espera: ",
+    lobbyTitle: "ID de Sala: ",
     lobbyDescription: "¡Prepárense para el duelo! Esperando que el admin inicie.",
     gameSettingsTitle: "Ajustes del Juego",
     rounds: "Rondas:",
@@ -155,7 +155,7 @@ export default function RoomLobbyPage() {
       router.replace('/');
     }
     setIsLoading(false);
-  }, [roomId, isAuthenticated, router, username, toast, T.roomNotFoundToast]);
+  }, [roomId, isAuthenticated, router, username, toast, T.roomNotFoundToast, T]);
 
   const isCurrentUserAdmin = roomData?.adminUsername === username;
 
@@ -197,7 +197,7 @@ export default function RoomLobbyPage() {
         <Card className="shadow-xl">
           <CardHeader className="text-center">
             <CardTitle className="text-4xl font-headline text-primary">
-              {T.lobbyTitle}{roomData.name}
+              {T.lobbyTitle}{roomId}
             </CardTitle>
             <CardDescription>{T.lobbyDescription}</CardDescription>
           </CardHeader>
@@ -291,3 +291,4 @@ export default function RoomLobbyPage() {
     </PageWrapper>
   );
 }
+
