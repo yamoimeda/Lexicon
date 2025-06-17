@@ -1,7 +1,7 @@
 // src/contexts/UserContext.tsx
 "use client";
 
-import React, { createContext, useContext, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, ReactNode, useCallback, useEffect } from 'react';
 import useLocalStorage from '@/hooks/useLocalStorage';
 import { useRouter } from 'next/navigation';
 
@@ -10,12 +10,15 @@ interface UserContextType {
   login: (name: string) => void;
   logout: () => void;
   isAuthenticated: boolean;
+  language: string;
+  setLanguage: (lang: string) => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [username, setUsername] = useLocalStorage<string | null>('wordduel-username', null);
+  const [language, setLanguageState] = useLocalStorage<string>('wordduel-language', 'en');
   const router = useRouter();
 
   const login = useCallback((name: string) => {
@@ -25,14 +28,23 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = useCallback(() => {
     setUsername(null);
-    // Potentially clear other game-related localStorage items here
     router.push('/login');
   }, [setUsername, router]);
+
+  const setLanguage = useCallback((lang: string) => {
+    setLanguageState(lang);
+  }, [setLanguageState]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      document.documentElement.lang = language;
+    }
+  }, [language]);
 
   const isAuthenticated = !!username;
 
   return (
-    <UserContext.Provider value={{ username, login, logout, isAuthenticated }}>
+    <UserContext.Provider value={{ username, login, logout, isAuthenticated, language, setLanguage }}>
       {children}
     </UserContext.Provider>
   );
