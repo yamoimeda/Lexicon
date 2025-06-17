@@ -1,16 +1,15 @@
 // src/components/room/CreateRoomForm.tsx
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@/contexts/UserContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Settings, Languages, Users, Clock, ListOrdered } from 'lucide-react';
+import { PlusCircle, Settings, Languages, Clock, ListOrdered } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface RoomSettings {
@@ -18,7 +17,7 @@ interface RoomSettings {
   numberOfRounds: number;
   timePerRound: number; // in seconds
   categories: string; // Comma-separated string
-  language: string;
+  language: string; // Game content language
 }
 
 const translations = {
@@ -30,7 +29,7 @@ const translations = {
     timePerRoundLabel: "Time Per Round (seconds)",
     categoriesLabel: "Categories (comma-separated)",
     categoriesDescription: "Enter a list of categories for players to find words for.",
-    languageLabel: "Language",
+    languageLabel: "Language (Game Content)",
     selectLanguagePlaceholder: "Select language",
     english: "English",
     spanish: "Español (Spanish)",
@@ -50,7 +49,7 @@ const translations = {
     timePerRoundLabel: "Tiempo por Ronda (segundos)",
     categoriesLabel: "Categorías (separadas por coma)",
     categoriesDescription: "Ingresa una lista de categorías para que los jugadores encuentren palabras.",
-    languageLabel: "Idioma",
+    languageLabel: "Idioma (Contenido del Juego)",
     selectLanguagePlaceholder: "Seleccionar idioma",
     english: "Inglés (English)",
     spanish: "Español",
@@ -66,19 +65,32 @@ const translations = {
 
 const generateRoomId = () => Math.random().toString(36).substring(2, 8).toUpperCase();
 
+// Helper to map UI language code to Game Content Language string
+const mapUiLangToGameLang = (uiLang: string): string => {
+  if (uiLang === 'es') {
+    return 'Spanish';
+  }
+  return 'English'; // Default to English
+};
+
 export default function CreateRoomForm() {
   const router = useRouter();
-  const { username, language: userLanguage } = useUser(); // Use userLanguage for UI, settings.language for game setting
+  const { username, language: uiLanguage } = useUser(); // uiLanguage is 'en', 'es', etc.
   const { toast } = useToast();
-  const T = translations[userLanguage as keyof typeof translations] || translations.en;
+  const T = translations[uiLanguage as keyof typeof translations] || translations.en;
   
   const [settings, setSettings] = useState<RoomSettings>({
-    roomName: `${username}'s Game`,
+    roomName: `${username || 'Player'}'s Game`,
     numberOfRounds: 3,
     timePerRound: 60,
     categories: "Animals, Countries, Fruits, Colors, Sports",
-    language: 'English', // This is the game's content language, not UI language
+    language: mapUiLangToGameLang(uiLanguage), // Game content language, e.g., "English", "Spanish"
   });
+
+  // Update game language if UI language changes after component mount
+  useEffect(() => {
+    setSettings(prev => ({ ...prev, language: mapUiLangToGameLang(uiLanguage) }));
+  }, [uiLanguage]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -94,6 +106,7 @@ export default function CreateRoomForm() {
     e.preventDefault();
     const roomId = generateRoomId();
     try {
+      // Store settings including admin and the explicitly set gameLanguage
       localStorage.setItem(`room-${roomId}-settings`, JSON.stringify({...settings, admin: username, gameLanguage: settings.language}));
       localStorage.setItem(`room-${roomId}-players`, JSON.stringify([{id: "1", name: username, score: 0}])); 
       toast({
@@ -150,7 +163,7 @@ export default function CreateRoomForm() {
           </div>
 
           <div>
-            <Label htmlFor="language" className="font-semibold flex items-center"><Languages className="mr-2 h-4 w-4 text-muted-foreground"/>{T.languageLabel} (Game Content)</Label>
+            <Label htmlFor="language" className="font-semibold flex items-center"><Languages className="mr-2 h-4 w-4 text-muted-foreground"/>{T.languageLabel}</Label>
             <Select name="language" value={settings.language} onValueChange={(value) => handleSelectChange('language', value)}>
               <SelectTrigger className="w-full mt-1">
                 <SelectValue placeholder={T.selectLanguagePlaceholder} />
