@@ -8,26 +8,26 @@ body {
 
 @layer base {
   :root {
-    --background: 50 70% 95%; /* Soft Cream */
-    --foreground: 30 60% 25%; /* Dark Brown */
+    --background: 195 100% 96%; /* Very Light Sky Blue */
+    --foreground: 220 30% 25%; /* Darker Blue-Gray for text */
     --card: 0 0% 100%; /* White */
-    --card-foreground: 30 60% 25%; /* Dark Brown */
+    --card-foreground: 220 30% 25%; /* Darker Blue-Gray */
     --popover: 0 0% 100%; /* White */
-    --popover-foreground: 30 60% 25%; /* Dark Brown */
-    --primary: 28 100% 62%; /* Vibrant Orange */
+    --popover-foreground: 220 30% 25%; /* Darker Blue-Gray */
+    --primary: 28 100% 62%; /* Vibrant Orange - Kept as requested */
     --primary-foreground: 0 0% 100%; /* White */
     --secondary: 175 60% 70%; /* Soft Teal */
     --secondary-foreground: 175 60% 20%; /* Dark Teal */
-    --muted: 40 60% 90%; /* Light Peachy-Gray */
-    --muted-foreground: 40 30% 50%; /* Grayish Brown */
+    --muted: 200 60% 92%; /* Light Bluish-Gray */
+    --muted-foreground: 200 30% 50%; /* Grayish Blue */
     --accent: 330 90% 70%; /* Bright Pink */
     --accent-foreground: 330 90% 15%; /* Dark Pink/Brown */
     --destructive: 0 84% 60%; /* Standard Red */
     --destructive-foreground: 0 0% 100%; /* White */
-    --border: 30 50% 80%; /* Light Brownish Gray */
+    --border: 195 50% 85%; /* Lighter Sky Blue-Gray */
     --input: 0 0% 100%; /* White */
-    --ring: 28 100% 70%; /* Lighter Orange */
-    --radius: 0.75rem; /* Increased for more rounded feel */
+    --ring: 28 100% 70%; /* Lighter Orange for focus */
+    --radius: 0.85rem; /* Slightly more rounded for cartoon feel */
 
     --chart-1: 10 90% 65%;   /* Bright Red-Orange */
     --chart-2: 190 80% 55%;  /* Bright Cyan */
@@ -35,13 +35,13 @@ body {
     --chart-4: 50 100% 60%;  /* Bright Yellow */
     --chart-5: 140 70% 60%;  /* Bright Green */
 
-    --sidebar-background: 50 70% 97%; /* Lighter Soft Cream */
-    --sidebar-foreground: 30 60% 25%;
+    --sidebar-background: 195 100% 98%; /* Even Lighter Sky Blue */
+    --sidebar-foreground: 220 30% 25%;
     --sidebar-primary: 28 100% 62%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 330 90% 70%;
     --sidebar-accent-foreground: 330 90% 15%;
-    --sidebar-border: 30 50% 85%;
+    --sidebar-border: 195 50% 90%;
     --sidebar-ring: 28 100% 70%;
   }
 
@@ -65,7 +65,7 @@ body {
     --border: 220 20% 30%; /* Medium Dark Gray-Blue */
     --input: 220 20% 22%; /* Dark input background */
     --ring: 28 100% 75%; /* Lighter Orange */
-    /* --radius: 0.75rem; /* Already set in :root */
+    /* --radius: 0.85rem; /* Already set in :root */
 
     --chart-1: 10 90% 70%;
     --chart-2: 190 80% 60%;
