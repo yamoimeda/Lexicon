@@ -220,6 +220,17 @@ export default function GamePage() {
   }, [roomSettings, isLoadingSettings, usedLetters, roomId, username]);
 
 
+  const handleSubmitWordsAndGoToReview = useCallback(async () => {
+    if (!roomSettings || !username || isSubmitting) return;
+    setIsSubmitting(true);
+
+    const submissionsToStore = wordSubmissions.map(s => ({ category: s.category, word: s.word }));
+    localStorage.setItem(`room-${roomId}-round-${roomSettings.currentRound}-player-${username}-submissions`, JSON.stringify(submissionsToStore));
+
+    router.push(`/rooms/${roomId}/round/${roomSettings.currentRound}/review`);
+    // setIsSubmitting will be false upon navigation or unmount
+  }, [roomSettings, username, wordSubmissions, roomId, router, isSubmitting]);
+
   // Timer effect
   useEffect(() => {
     if (timeLeft > 0 && !isLoadingSettings && roomSettings && !isSubmitting) {
@@ -231,7 +242,7 @@ export default function GamePage() {
         handleSubmitWordsAndGoToReview();
       }
     }
-  }, [timeLeft, isLoadingSettings, roomSettings, isSubmitting, T, handleSubmitWordsAndGoToReview]);
+  }, [timeLeft, isLoadingSettings, roomSettings, isSubmitting, T, toast, handleSubmitWordsAndGoToReview]);
 
 
   const handleWordChange = (category: string, newWord: string) => {
@@ -290,17 +301,6 @@ export default function GamePage() {
       setWordSubmissions(prevWords => prevWords.map(cw => cw.category === category ? {...cw, isLoading: false} : cw));
     }
   };
-
-  const handleSubmitWordsAndGoToReview = useCallback(async () => {
-    if (!roomSettings || !username || isSubmitting) return;
-    setIsSubmitting(true);
-
-    const submissionsToStore = wordSubmissions.map(s => ({ category: s.category, word: s.word }));
-    localStorage.setItem(`room-${roomId}-round-${roomSettings.currentRound}-player-${username}-submissions`, JSON.stringify(submissionsToStore));
-
-    router.push(`/rooms/${roomId}/round/${roomSettings.currentRound}/review`);
-    // setIsSubmitting will be false upon navigation or unmount
-  }, [roomSettings, username, wordSubmissions, roomId, router, isSubmitting]);
 
 
   if (!isAuthenticated || isLoadingSettings) {
