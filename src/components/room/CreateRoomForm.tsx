@@ -2,7 +2,7 @@
 // src/components/room/CreateRoomForm.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@/contexts/UserContext';
 import { Button } from '@/components/ui/button';
@@ -46,7 +46,7 @@ const translations = {
     toastRoomCreatedDescription: (roomName: string, roomId: string) => `Room ${roomName} (ID: ${roomId}) is ready.`,
     toastCreationFailedTitle: "Failed to create room",
     toastCreationFailedDescription: "Could not save room settings locally. Please try again.",
-    defaultCategoriesPlaceholder: "e.g., Animals, Countries, Fruits",
+    defaultCategoriesPlaceholder: (lang: string) => (defaultCategories[lang as keyof typeof defaultCategories] || defaultCategories.en).join(', '),
     usernameNotAvailableError: "Username not available. Cannot create room.",
   },
   es: {
@@ -68,7 +68,7 @@ const translations = {
     toastRoomCreatedDescription: (roomName: string, roomId: string) => `La sala ${roomName} (ID: ${roomId}) está lista.`,
     toastCreationFailedTitle: "Error al crear la sala",
     toastCreationFailedDescription: "No se pudieron guardar los ajustes de la sala localmente. Por favor, inténtalo de nuevo.",
-    defaultCategoriesPlaceholder: "ej: Animales, Países, Frutas",
+    defaultCategoriesPlaceholder: (lang: string) => (defaultCategories[lang as keyof typeof defaultCategories] || defaultCategories.es).join(', '),
     usernameNotAvailableError: "Nombre de usuario no disponible. No se puede crear la sala.",
   }
 };
@@ -88,27 +88,34 @@ export default function CreateRoomForm() {
   const { toast } = useToast();
   const T = translations[uiLanguage as keyof typeof translations] || translations.en;
   
-  const getTranslatedDefaultCategories = (langKey: string): string => {
+  const getTranslatedDefaultCategories = useCallback((langKey: string): string => {
     const categories = defaultCategories[langKey as keyof typeof defaultCategories] || defaultCategories.en;
     return categories.join(', ');
-  };
+  }, []);
 
-  const [settings, setSettings] = useState<RoomSettings>({
-    roomName: `${username || 'Player'}'s Game`,
-    numberOfRounds: 3,
-    timePerRound: 60,
-    categories: getTranslatedDefaultCategories(uiLanguage),
-    language: mapUiLangToGameLang(uiLanguage),
+  const [settings, setSettings] = useState<RoomSettings>(() => {
+    // Initialize with potentially server-rendered (initial) values from useUser
+    const initialGameLanguage = mapUiLangToGameLang(uiLanguage);
+    const initialCategories = getTranslatedDefaultCategories(uiLanguage);
+    const initialRoomName = `${username || 'Player'}'s Game`;
+    return {
+      roomName: initialRoomName,
+      numberOfRounds: 3,
+      timePerRound: 60,
+      categories: initialCategories,
+      language: initialGameLanguage,
+    };
   });
 
   useEffect(() => {
+    // This effect runs on the client when uiLanguage or username might have updated from localStorage
     setSettings(prev => ({
       ...prev,
       language: mapUiLangToGameLang(uiLanguage),
       categories: getTranslatedDefaultCategories(uiLanguage),
       roomName: `${username || 'Player'}'s Game`,
     }));
-  }, [uiLanguage, username]);
+  }, [uiLanguage, username, getTranslatedDefaultCategories]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -132,7 +139,9 @@ export default function CreateRoomForm() {
     }
     const roomId = generateRoomId();
     try {
-      localStorage.setItem(`room-${roomId}-settings`, JSON.stringify({...settings, admin: username}));
+      const roomSettingsToStore = { ...settings, admin: username };
+      localStorage.setItem(`room-${roomId}-settings`, JSON.stringify(roomSettingsToStore));
+      // Ensure the creator is also added to the players list with a score of 0
       localStorage.setItem(`room-${roomId}-players`, JSON.stringify([{id: username, name: username, score: 0}])); 
       toast({
         title: T.toastRoomCreatedTitle,
@@ -180,7 +189,7 @@ export default function CreateRoomForm() {
               name="categories" 
               value={settings.categories} 
               onChange={handleChange} 
-              placeholder={T.defaultCategoriesPlaceholder}
+              placeholder={T.defaultCategoriesPlaceholder(uiLanguage)}
               required 
               className="mt-1"
             />
