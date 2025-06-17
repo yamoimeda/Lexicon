@@ -19,32 +19,34 @@ import { useToast } from '@/hooks/use-toast';
 interface Player {
   id: string;
   name: string;
-  score: number;
+  score: number; // Total score
 }
 
-interface CategoryWord {
+interface CategoryWordSubmission {
   category: string;
   word: string;
-  isValid?: boolean;
-  validationReason?: string;
-  isLoading?: boolean;
+  isValid?: boolean; // Will be determined in review
+  validationReason?: string; // Will be determined in review
+  isLoading?: boolean; // For UI during validation/suggestion on this page
 }
 
 interface RoomSettingsData {
   numberOfRounds: number;
   timePerRound: number;
   categories: string[];
-  gameLanguage: string; // Language for AI interactions
+  gameLanguage: string;
+  admin: string;
+  currentRound: number;
 }
 
-// StoredRoomSettings is the shape of the object in localStorage
 interface StoredRoomSettings {
   roomName: string;
   numberOfRounds: number;
   timePerRound: number;
-  categories: string; // Comma-separated string
-  language: string; // Game content language, e.g., "English"
+  categories: string;
+  language: string;
   admin: string;
+  currentRound: number;
 }
 
 const translations = {
@@ -65,10 +67,8 @@ const translations = {
     noSuggestionsDescription: (category: string, letter: string) => `Could not find a suggestion for ${category} with the letter "${letter}".`,
     errorSuggestingToast: "Error getting suggestions",
     errorSuggestingDescription: "Could not connect to AI service.",
-    submitWordsForRound: "Submit Words for Round",
+    submitWordsForRound: "Submit Words for Review",
     submitting: "Submitting...",
-    nextRoundToastTitle: (round: number) => `Round ${round} starting!`,
-    nextRoundToastDescription: "Get ready for new letters.",
     gameInfo: "Game Info",
     roomIdLabel: "Room ID:",
     yourNameLabel: "Your Name:",
@@ -77,7 +77,7 @@ const translations = {
     loadingRoomSettings: "Loading game settings...",
     errorLoadingRoomSettings: "Could not load game settings. AI features might use default language. Please ensure room settings are available.",
     secondsSuffix: "s",
-    gameOver: "Game Over! Calculating results...",
+    timeUp: "Time's Up! Submitting your words...",
   },
   es: {
     round: "Ronda",
@@ -96,10 +96,8 @@ const translations = {
     noSuggestionsDescription: (category: string, letter: string) => `No se pudo encontrar una sugerencia para ${category} con la letra "${letter}".`,
     errorSuggestingToast: "Error al obtener sugerencias",
     errorSuggestingDescription: "No se pudo conectar al servicio de IA.",
-    submitWordsForRound: "Enviar Palabras de la Ronda",
+    submitWordsForRound: "Enviar Palabras para Revisión",
     submitting: "Enviando...",
-    nextRoundToastTitle: (round: number) => `¡Ronda ${round} iniciando!`,
-    nextRoundToastDescription: "Prepárate para nuevas letras.",
     gameInfo: "Info del Juego",
     roomIdLabel: "ID de Sala:",
     yourNameLabel: "Tu Nombre:",
@@ -108,7 +106,7 @@ const translations = {
     loadingRoomSettings: "Cargando configuración del juego...",
     errorLoadingRoomSettings: "No se pudo cargar la configuración del juego. Las funciones de IA podrían usar el idioma predeterminado. Asegúrate que la configuración de la sala esté disponible.",
     secondsSuffix: "s",
-    gameOver: "¡Juego Terminado! Calculando resultados...",
+    timeUp: "¡Se acabó el tiempo! Enviando tus palabras...",
   }
 };
 
@@ -123,24 +121,21 @@ export default function GamePage() {
   const [roomSettings, setRoomSettings] = useState<RoomSettingsData | null>(null);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
-  const [currentRound, setCurrentRound] = useState(1);
-  const [letters, setLetters] = useState("");
-  const [timeLeft, setTimeLeft] = useState(60);
-  const [words, setWords] = useState<CategoryWord[]>([]);
+  const [currentLetter, setCurrentLetter] = useState("");
+  const [timeLeft, setTimeLeft] = useState(0); // Will be set from roomSettings
+  const [wordSubmissions, setWordSubmissions] = useState<CategoryWordSubmission[]>([]);
   const [usedLetters, setUsedLetters] = useState<string[]>([]);
 
-  const [players, setPlayers] = useState<Player[]>([
-    { id: "1", name: username || "You", score: 0 },
-    { id: "2", name: "Player2", score: 0 }, // Mock player
-  ]);
+  const [players, setPlayers] = useState<Player[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !username) {
       router.replace('/login');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, username, router]);
 
+  // Load room settings and player data
   useEffect(() => {
     if (!roomId) return;
     setIsLoadingSettings(true);
@@ -148,88 +143,113 @@ export default function GamePage() {
     if (storedSettingsRaw) {
       try {
         const parsedSettings: StoredRoomSettings = JSON.parse(storedSettingsRaw);
-        const loadedSettings = {
+        if (!parsedSettings.currentRound) {
+          // Game hasn't officially started round 1 via lobby
+          toast({ variant: "destructive", title: "Error", description: "Game round not initialized. Returning to lobby." });
+          router.push(`/rooms/${roomId}/lobby`);
+          return;
+        }
+        const loadedSettings: RoomSettingsData = {
           numberOfRounds: parsedSettings.numberOfRounds,
           timePerRound: parsedSettings.timePerRound,
           categories: parsedSettings.categories.split(',').map(c => c.trim()),
           gameLanguage: parsedSettings.language,
+          admin: parsedSettings.admin,
+          currentRound: parsedSettings.currentRound,
         };
         setRoomSettings(loadedSettings);
-        setTimeLeft(loadedSettings.timePerRound); // Initialize timeLeft from settings
+        setTimeLeft(loadedSettings.timePerRound);
+        setWordSubmissions(loadedSettings.categories.map(cat => ({ category: cat, word: "", isLoading: false })));
+
+        // Load used letters for this room to ensure no repeats
+        const storedUsedLetters = localStorage.getItem(`room-${roomId}-used-letters`);
+        if (storedUsedLetters) {
+          setUsedLetters(JSON.parse(storedUsedLetters));
+        }
+
       } catch (e) {
         console.error("Error parsing room settings for game page:", e);
         toast({ variant: "destructive", title: T.errorLoadingRoomSettings });
-        // Fallback to some defaults if parsing fails or settings are incomplete
-        setRoomSettings({ 
-            numberOfRounds: 3, 
-            timePerRound: 60, 
-            categories: ["Animals", "Countries", "Fruits"], 
-            gameLanguage: "English" 
-        });
+        setRoomSettings(null); // Indicate error
       }
     } else {
       toast({ variant: "destructive", title: T.errorLoadingRoomSettings });
-       setRoomSettings({ 
-            numberOfRounds: 3, 
-            timePerRound: 60, 
-            categories: ["Animals", "Countries", "Fruits"], 
-            gameLanguage: "English" 
-        });
+      setRoomSettings(null); // Indicate error
     }
+
+    const storedPlayersRaw = localStorage.getItem(`room-${roomId}-players`);
+    if (storedPlayersRaw) {
+        try {
+            setPlayers(JSON.parse(storedPlayersRaw));
+        } catch (e) {
+            console.error("Error parsing players for game page:", e);
+        }
+    }
+
     setIsLoadingSettings(false);
-  }, [roomId, T, toast]);
+  }, [roomId, T, toast, router]);
 
+
+  // Generate new letter for the current round if not already generated
   useEffect(() => {
-    if (roomSettings?.categories) {
-      setWords(roomSettings.categories.map(cat => ({ category: cat, word: "", isLoading: false })));
+    if (isLoadingSettings || !roomSettings || !username) return;
+
+    const roundLetterKey = `room-${roomId}-round-${roomSettings.currentRound}-letter`;
+    let letterForRound = localStorage.getItem(roundLetterKey);
+
+    if (!letterForRound) {
+      const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      const availableLetters = alphabet.split('').filter(l => !usedLetters.includes(l));
+      
+      if (availableLetters.length > 0) {
+        letterForRound = availableLetters[Math.floor(Math.random() * availableLetters.length)];
+      } else {
+        // All letters used, allow repeats but prioritize ones not recently used if complex logic desired
+        // For now, just pick any random letter if exhausted
+        letterForRound = alphabet[Math.floor(Math.random() * alphabet.length)];
+        console.warn("All unique letters used, repeating letters for new round.");
+      }
+      localStorage.setItem(roundLetterKey, letterForRound);
+      setUsedLetters(prev => {
+          const newUsedLetters = [...prev, letterForRound!];
+          localStorage.setItem(`room-${roomId}-used-letters`, JSON.stringify(newUsedLetters));
+          return newUsedLetters;
+      });
     }
-  }, [roomSettings?.categories]);
+    setCurrentLetter(letterForRound);
+  }, [roomSettings, isLoadingSettings, usedLetters, roomId, username]);
 
 
+  // Timer effect
   useEffect(() => {
-    if (isLoadingSettings || !roomSettings) return; 
-
-    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    const availableLetters = alphabet.split('').filter(l => !usedLetters.includes(l));
-    
-    let randomLetter;
-    if (availableLetters.length > 0) {
-      randomLetter = availableLetters[Math.floor(Math.random() * availableLetters.length)];
-    } else {
-      randomLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
-      // console.warn("All letters used, repeating letters for new round.");
-    }
-    setLetters(randomLetter);
-  }, [currentRound, usedLetters, isLoadingSettings, roomSettings]);
-
-  useEffect(() => {
-    if (timeLeft > 0 && !isLoadingSettings && roomSettings) {
+    if (timeLeft > 0 && !isLoadingSettings && roomSettings && !isSubmitting) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
-    } else if (timeLeft === 0 && !isSubmitting) {
-        // Auto-submit if time runs out
-        // console.log("Time ran out, auto-submitting.");
-        // handleSubmitAllWords(); // Potentially enable this, careful with multiple submissions
+    } else if (timeLeft === 0 && !isSubmitting && roomSettings && !isLoadingSettings) {
+      if (!isSubmitting) { // Ensure it's not already submitting
+        toast({ title: T.timeUp });
+        handleSubmitWordsAndGoToReview();
+      }
     }
-  }, [timeLeft, isLoadingSettings, roomSettings, isSubmitting]);
+  }, [timeLeft, isLoadingSettings, roomSettings, isSubmitting, T, handleSubmitWordsAndGoToReview]);
 
 
   const handleWordChange = (category: string, newWord: string) => {
-    setWords(prevWords => 
-      prevWords.map(cw => 
+    setWordSubmissions(prevWords =>
+      prevWords.map(cw =>
         cw.category === category ? { ...cw, word: newWord, isValid: undefined, validationReason: undefined } : cw
       )
     );
   };
 
-  const handleValidateWord = async (category: string, word: string) => {
+  const handleValidateWordLocal = async (category: string, word: string) => {
     if (!word.trim() || !roomSettings) return;
-    setWords(prevWords => prevWords.map(cw => cw.category === category ? {...cw, isLoading: true} : cw));
+    setWordSubmissions(prevWords => prevWords.map(cw => cw.category === category ? {...cw, isLoading: true} : cw));
     try {
       const input: ValidateWordInput = { word, category, language: roomSettings.gameLanguage };
       const result = await validateWord(input);
-      setWords(prevWords => 
-        prevWords.map(cw => 
+      setWordSubmissions(prevWords =>
+        prevWords.map(cw =>
           cw.category === category ? { ...cw, isValid: result.isValid, validationReason: result.reason, isLoading: false } : cw
         )
       );
@@ -243,82 +263,45 @@ export default function GamePage() {
     } catch (error) {
       console.error("Validation error:", error);
       toast({variant: "destructive", title: T.errorValidatingToast, description: T.errorValidatingDescription});
-      setWords(prevWords => prevWords.map(cw => cw.category === category ? {...cw, isLoading: false} : cw));
+      setWordSubmissions(prevWords => prevWords.map(cw => cw.category === category ? {...cw, isLoading: false} : cw));
     }
   };
 
-  const handleSuggestWords = async (category: string) => {
-    if (!roomSettings || !letters) return;
-    setWords(prevWords => prevWords.map(cw => cw.category === category ? {...cw, isLoading: true} : cw));
+  const handleSuggestWordsLocal = async (category: string) => {
+    if (!roomSettings || !currentLetter) return;
+    setWordSubmissions(prevWords => prevWords.map(cw => cw.category === category ? {...cw, isLoading: true} : cw));
     try {
-      const input: SuggestValidWordsInput = { letters: letters, category, language: roomSettings.gameLanguage, numberOfSuggestions: 1 };
+      const input: SuggestValidWordsInput = { letters: currentLetter, category, language: roomSettings.gameLanguage, numberOfSuggestions: 1 };
       const result = await suggestValidWords(input);
       if (result.suggestions && result.suggestions.length > 0) {
         toast({
           title: T.suggestionToastTitle(category),
           description: T.suggestionToastDescription(result.suggestions[0]),
         });
+        // Optionally auto-fill the suggestion
+        // handleWordChange(category, result.suggestions[0]);
       } else {
-        toast({title: T.noSuggestionsToast, description: T.noSuggestionsDescription(category, letters)});
+        toast({title: T.noSuggestionsToast, description: T.noSuggestionsDescription(category, currentLetter)});
       }
     } catch (error) {
       console.error("Suggestion error:", error);
       toast({variant: "destructive", title: T.errorSuggestingToast, description: T.errorSuggestingDescription});
     } finally {
-      setWords(prevWords => prevWords.map(cw => cw.category === category ? {...cw, isLoading: false} : cw));
+      setWordSubmissions(prevWords => prevWords.map(cw => cw.category === category ? {...cw, isLoading: false} : cw));
     }
   };
 
-  const handleSubmitAllWords = async () => {
-    if (!roomSettings) return;
+  const handleSubmitWordsAndGoToReview = useCallback(async () => {
+    if (!roomSettings || !username || isSubmitting) return;
     setIsSubmitting(true);
-    
-    let currentRoundScore = 0;
-    for (const cw of words) {
-      if (cw.word.trim()) {
-        if (cw.isValid === undefined) { // Validate if not already validated
-          try {
-            const input: ValidateWordInput = { word: cw.word, category: cw.category, language: roomSettings.gameLanguage };
-            const result = await validateWord(input);
-            // Update word state immediately after validation
-             setWords(prevWords => 
-                prevWords.map(item => 
-                    item.category === cw.category ? { ...item, isValid: result.isValid, validationReason: result.reason, isLoading: false } : item
-                )
-            );
-            if (result.isValid) {
-              currentRoundScore += 10; // Example scoring
-            }
-          } catch (error) {
-            console.error("Validation error during submission:", error);
-            setWords(prevWords => prevWords.map(item => item.category === cw.category ? {...item, isLoading: false} : item));
-          }
-        } else if (cw.isValid === true) {
-            currentRoundScore += 10; // Add score for already validated words
-        }
-      }
-    }
 
-    // Update player score (mocking for current user)
-    setPlayers(prevPlayers => prevPlayers.map(p => p.name === username ? {...p, score: p.score + currentRoundScore} : p));
+    const submissionsToStore = wordSubmissions.map(s => ({ category: s.category, word: s.word }));
+    localStorage.setItem(`room-${roomId}-round-${roomSettings.currentRound}-player-${username}-submissions`, JSON.stringify(submissionsToStore));
 
-    setUsedLetters(prev => [...prev, letters]);
-    
-    if (currentRound >= roomSettings.numberOfRounds) {
-      toast({ title: T.gameOver });
-      // TODO: Store final player scores in localStorage before redirecting to results
-      // For now, just redirect
-      router.push(`/rooms/${roomId}/results`);
-    } else {
-      setCurrentRound(prev => prev + 1);
-      setTimeLeft(roomSettings.timePerRound);
-      if (roomSettings.categories) {
-        setWords(roomSettings.categories.map(cat => ({ category: cat, word: "", isLoading: false })));
-      }
-      toast({title: T.nextRoundToastTitle(currentRound + 1), description: T.nextRoundToastDescription})
-    }
-    setIsSubmitting(false);
-  };
+    router.push(`/rooms/${roomId}/round/${roomSettings.currentRound}/review`);
+    // setIsSubmitting will be false upon navigation or unmount
+  }, [roomSettings, username, wordSubmissions, roomId, router, isSubmitting]);
+
 
   if (!isAuthenticated || isLoadingSettings) {
     return <PageWrapper><div className="flex justify-center items-center h-full pt-10">{T.loadingRoomSettings}</div></PageWrapper>;
@@ -335,7 +318,7 @@ export default function GamePage() {
           <Card className="shadow-lg">
             <CardHeader>
               <div className="flex justify-between items-center">
-                <CardTitle className="text-3xl font-headline text-primary">{T.round} {currentRound}/{roomSettings.numberOfRounds}</CardTitle>
+                <CardTitle className="text-3xl font-headline text-primary">{T.round} {roomSettings.currentRound}/{roomSettings.numberOfRounds}</CardTitle>
                 <div className="flex items-center gap-2 text-xl font-semibold text-accent">
                   <Clock size={24} />
                   <span>{Math.floor(timeLeft / 60)}:{('0' + (timeLeft % 60)).slice(-2)}</span>
@@ -346,11 +329,11 @@ export default function GamePage() {
             <CardContent>
               <div className="text-center mb-6 p-4 bg-primary/10 rounded-lg">
                 <p className="text-sm text-primary font-medium mb-1">{T.yourLetter}</p>
-                <p className="text-6xl font-headline font-bold tracking-widest text-primary">{letters}</p>
+                <p className="text-6xl font-headline font-bold tracking-widest text-primary">{currentLetter}</p>
               </div>
-              
-              <form onSubmit={(e) => { e.preventDefault(); handleSubmitAllWords(); }} className="space-y-4">
-                {words.map((cw, index) => (
+
+              <form onSubmit={(e) => { e.preventDefault(); handleSubmitWordsAndGoToReview(); }} className="space-y-4">
+                {wordSubmissions.map((cw, index) => (
                   <Card key={index} className={`p-4 ${cw.isValid === true ? 'border-green-500' : cw.isValid === false ? 'border-red-500' : ''}`}>
                     <Label htmlFor={`word-${index}`} className="text-lg font-semibold text-foreground/90">{cw.category}</Label>
                     <div className="flex items-center gap-2 mt-1">
@@ -364,10 +347,10 @@ export default function GamePage() {
                         disabled={cw.isLoading || isSubmitting || timeLeft === 0}
                         autoCapitalize="words"
                       />
-                       <Button type="button" size="icon" variant="ghost" onClick={() => handleValidateWord(cw.category, cw.word)} disabled={!cw.word.trim() || cw.isLoading || isSubmitting  || timeLeft === 0} title={T.validateWord}>
+                       <Button type="button" size="icon" variant="ghost" onClick={() => handleValidateWordLocal(cw.category, cw.word)} disabled={!cw.word.trim() || cw.isLoading || isSubmitting  || timeLeft === 0} title={T.validateWord}>
                         {cw.isLoading && cw.word ? <HelpCircle className="animate-spin h-5 w-5"/> : cw.isValid === true ? <CheckCircle className="text-green-500 h-5 w-5"/> : cw.isValid === false ? <AlertCircle className="text-red-500 h-5 w-5"/> : <HelpCircle className="h-5 w-5"/>}
                       </Button>
-                      <Button type="button" size="icon" variant="ghost" onClick={() => handleSuggestWords(cw.category)} disabled={cw.isLoading || isSubmitting || timeLeft === 0} title={T.getSuggestion}>
+                      <Button type="button" size="icon" variant="ghost" onClick={() => handleSuggestWordsLocal(cw.category)} disabled={cw.isLoading || isSubmitting || timeLeft === 0 || !currentLetter} title={T.getSuggestion}>
                         <Lightbulb className="h-5 w-5 text-yellow-500" />
                       </Button>
                     </div>
@@ -392,7 +375,8 @@ export default function GamePage() {
             <CardContent className="text-sm space-y-1">
               <p><strong>{T.roomIdLabel}</strong> {roomId}</p>
               <p><strong>{T.yourNameLabel}</strong> {username}</p>
-              <p><strong>{T.round}:</strong> {currentRound}/{roomSettings.numberOfRounds}</p>
+              <p><strong>{T.round}:</strong> {roomSettings.currentRound}/{roomSettings.numberOfRounds}</p>
+              <p><strong>{T.yourLetter}</strong> {currentLetter}</p>
               <p><strong>{translations.en.timePerRound}:</strong> {roomSettings.timePerRound}{T.secondsSuffix}</p>
               <p><strong>{translations.en.language}:</strong> {roomSettings.gameLanguage}</p>
               <p><strong>{translations.en.categories}:</strong> {roomSettings.categories.join(', ')}</p>
@@ -418,4 +402,4 @@ export default function GamePage() {
     </PageWrapper>
   );
 }
-    
+

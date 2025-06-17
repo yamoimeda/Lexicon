@@ -1,7 +1,8 @@
+
 // src/app/rooms/[roomId]/results/page.tsx
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import PageWrapper from '@/components/layout/PageWrapper';
 import { useUser } from '@/contexts/UserContext';
 import { useRouter, useParams } from 'next/navigation';
@@ -9,38 +10,90 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Trophy, ListOrdered, RotateCcw, Home } from 'lucide-react';
 
-// Mock data, replace with actual context/API data later
 interface PlayerResult {
   id: string;
   name: string;
   score: number;
-  rank: number;
+  rank?: number; // Rank will be calculated
 }
 
+const translations = {
+  en: {
+    pageTitle: "Game Over!",
+    congratulations: (winnerName: string) => `Congratulations ${winnerName}, you are the WordDuel Champion!`,
+    noWinner: "Well played everyone!",
+    finalScores: "Final Scores:",
+    playAgainButton: "Play Again in this Room",
+    backToHomeButton: "Back to Home",
+    loadingResults: "Loading results...",
+    errorLoadingResults: "Could not load player results.",
+    pointsSuffix: "pts",
+  },
+  es: {
+    pageTitle: "¡Juego Terminado!",
+    congratulations: (winnerName: string) => `¡Felicidades ${winnerName}, eres el Campeón de WordDuel!`,
+    noWinner: "¡Bien jugado todos!",
+    finalScores: "Puntuaciones Finales:",
+    playAgainButton: "Jugar de Nuevo en esta Sala",
+    backToHomeButton: "Volver al Inicio",
+    loadingResults: "Cargando resultados...",
+    errorLoadingResults: "No se pudieron cargar los resultados de los jugadores.",
+    pointsSuffix: "pts",
+  }
+};
+
 export default function ResultsPage() {
-  const { isAuthenticated, username } = useUser();
+  const { isAuthenticated, username, language: uiLanguage } = useUser();
   const router = useRouter();
   const params = useParams();
   const roomId = params.roomId as string;
+  const T = translations[uiLanguage as keyof typeof translations] || translations.en;
 
-  // Mocked results data
-  const results: PlayerResult[] = [
-    { id: "1", name: username || "You", score: 150, rank: 1 },
-    { id: "2", name: "Player2", score: 120, rank: 2 },
-    { id: "3", name: "Player3", score: 90, rank: 3 },
-  ].sort((a, b) => a.rank - b.rank);
-
-  const winner = results[0];
+  const [results, setResults] = useState<PlayerResult[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.replace('/login');
+      return;
     }
-  }, [isAuthenticated, router]);
+    if (!roomId) {
+        router.push('/');
+        return;
+    }
 
-  if (!isAuthenticated) {
-    return null; // Or loading spinner
+    setIsLoading(true);
+    const playersRaw = localStorage.getItem(`room-${roomId}-players`);
+    if (playersRaw) {
+      try {
+        const playersData: PlayerResult[] = JSON.parse(playersRaw);
+        // Sort by score to determine rank
+        const sortedPlayers = [...playersData].sort((a, b) => b.score - a.score);
+        const rankedPlayers = sortedPlayers.map((player, index) => ({
+          ...player,
+          rank: index + 1,
+        }));
+        setResults(rankedPlayers);
+      } catch (e) {
+        console.error("Error parsing player results:", e);
+        setResults([]);
+      }
+    } else {
+      setResults([]); // No data found
+    }
+    setIsLoading(false);
+  }, [isAuthenticated, router, roomId, T]);
+
+
+  if (isLoading) {
+    return <PageWrapper><div className="flex justify-center items-center h-full pt-10">{T.loadingResults}</div></PageWrapper>;
   }
+
+  if (results.length === 0 && !isLoading) {
+     return <PageWrapper><div className="flex justify-center items-center h-full pt-10">{T.errorLoadingResults}</div></PageWrapper>;
+  }
+
+  const winner = results.length > 0 && results[0].score > 0 ? results[0] : null; // Check if score > 0 for a winner
 
   return (
     <PageWrapper>
@@ -50,36 +103,40 @@ export default function ResultsPage() {
             <div className="flex justify-center mb-4">
               <Trophy className="h-20 w-20 text-accent" />
             </div>
-            <CardTitle className="text-4xl font-headline text-primary">Game Over!</CardTitle>
-            {winner && (
+            <CardTitle className="text-4xl font-headline text-primary">{T.pageTitle}</CardTitle>
+            {winner ? (
               <CardDescription className="text-xl mt-2">
-                Congratulations <span className="font-bold text-accent">{winner.name}</span>, you are the WordDuel Champion!
+                {T.congratulations(winner.name)}
               </CardDescription>
+            ) : (
+                 <CardDescription className="text-xl mt-2">
+                    {T.noWinner}
+                 </CardDescription>
             )}
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
               <h3 className="text-2xl font-semibold mb-4 text-primary flex items-center justify-center">
-                <ListOrdered className="mr-2" /> Final Scores:
+                <ListOrdered className="mr-2" /> {T.finalScores}
               </h3>
               <ul className="space-y-2">
                 {results.map((player) => (
-                  <li 
-                    key={player.id} 
+                  <li
+                    key={player.id}
                     className={`flex justify-between items-center p-3 rounded-md text-left
-                                ${player.rank === 1 ? 'bg-accent/30 border-2 border-accent' : 
+                                ${player.rank === 1 && winner ? 'bg-accent/30 border-2 border-accent' :
                                  player.name === username ? 'bg-primary/10' : 'bg-muted/50'}`}
                   >
                     <div className="flex items-center">
-                      <span className={`font-bold text-lg w-8 text-center ${player.rank === 1 ? 'text-accent-foreground' : 'text-primary'}`}>
+                      <span className={`font-bold text-lg w-8 text-center ${player.rank === 1 && winner ? 'text-accent-foreground' : 'text-primary'}`}>
                         {player.rank}.
                       </span>
-                      <span className={`text-lg ${player.rank === 1 ? 'font-bold text-accent-foreground' : ''}`}>
+                      <span className={`text-lg ${player.rank === 1 && winner ? 'font-bold text-accent-foreground' : ''}`}>
                         {player.name}
                       </span>
                     </div>
-                    <span className={`text-xl font-bold ${player.rank === 1 ? 'text-accent-foreground' : 'text-primary'}`}>
-                      {player.score} pts
+                    <span className={`text-xl font-bold ${player.rank === 1 && winner ? 'text-accent-foreground' : 'text-primary'}`}>
+                      {player.score} {T.pointsSuffix}
                     </span>
                   </li>
                 ))}
@@ -88,10 +145,10 @@ export default function ResultsPage() {
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6">
               <Button onClick={() => router.push(`/rooms/${roomId}/lobby`)} variant="outline" className="w-full sm:w-auto">
-                <RotateCcw className="mr-2 h-5 w-5" /> Play Again in this Room
+                <RotateCcw className="mr-2 h-5 w-5" /> {T.playAgainButton}
               </Button>
               <Button onClick={() => router.push('/')} className="w-full sm:w-auto bg-primary hover:bg-primary/90">
-                <Home className="mr-2 h-5 w-5" /> Back to Home
+                <Home className="mr-2 h-5 w-5" /> {T.backToHomeButton}
               </Button>
             </div>
           </CardContent>
@@ -100,3 +157,4 @@ export default function ResultsPage() {
     </PageWrapper>
   );
 }
+

@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 interface Player {
   id: string;
   name: string;
-  score: number; 
+  score: number;
 }
 
 interface StoredRoomSettings {
@@ -26,6 +26,7 @@ interface StoredRoomSettings {
   categories: string; // Comma-separated string
   language: string; // Game content language, e.g., "English"
   admin: string; // Admin's username
+  currentRound?: number; // Added for game flow
 }
 
 interface DisplayRoomDetails {
@@ -115,36 +116,34 @@ export default function RoomLobbyPage() {
     }
 
     if (!roomId || !username) {
-      // Still waiting for roomId or username to be available
-      // isLoading remains true, so "Loading room details..." will be shown
       return;
     }
 
     const storedSettingsRaw = localStorage.getItem(`room-${roomId}-settings`);
-    
+
     if (storedSettingsRaw) {
       try {
         const parsedSettings: StoredRoomSettings = JSON.parse(storedSettingsRaw);
-        
+
         let playersList: Player[] = [];
         const storedPlayersRaw = localStorage.getItem(`room-${roomId}-players`);
         if (storedPlayersRaw) {
-            try {
-                playersList = JSON.parse(storedPlayersRaw);
-            } catch (e) {
-                console.error("Error parsing players list from localStorage", e);
-                playersList = []; 
-            }
+          try {
+            playersList = JSON.parse(storedPlayersRaw);
+          } catch (e) {
+            console.error("Error parsing players list from localStorage", e);
+            playersList = [];
+          }
         }
 
         if (username && !playersList.find(p => p.name === username)) {
-            playersList.push({ id: username, name: username, score: 0 }); 
-            localStorage.setItem(`room-${roomId}-players`, JSON.stringify(playersList));
+          playersList.push({ id: username, name: username, score: 0 });
+          localStorage.setItem(`room-${roomId}-players`, JSON.stringify(playersList));
         }
-        
+
         if (parsedSettings.admin && !playersList.find(p => p.name === parsedSettings.admin)) {
-             playersList.push({ id: parsedSettings.admin, name: parsedSettings.admin, score: 0 });
-             localStorage.setItem(`room-${roomId}-players`, JSON.stringify(playersList));
+          playersList.push({ id: parsedSettings.admin, name: parsedSettings.admin, score: 0 });
+          localStorage.setItem(`room-${roomId}-players`, JSON.stringify(playersList));
         }
 
         setRoomData({
@@ -159,7 +158,7 @@ export default function RoomLobbyPage() {
           players: playersList,
         });
         if (parsedSettings.admin) {
-          setSelectedNewAdminUsername(parsedSettings.admin); 
+          setSelectedNewAdminUsername(parsedSettings.admin);
         }
 
       } catch (error) {
@@ -172,7 +171,7 @@ export default function RoomLobbyPage() {
       router.replace('/');
     }
     setIsLoading(false);
-  }, [roomId, isAuthenticated, router, username, toast, T]); // T is included as its content depends on uiLanguage
+  }, [roomId, isAuthenticated, router, username, toast, T]);
 
   const isCurrentUserAdmin = roomData?.adminUsername === username;
 
@@ -185,7 +184,7 @@ export default function RoomLobbyPage() {
         const parsedSettings: StoredRoomSettings = JSON.parse(storedSettingsRaw);
         const updatedSettings = { ...parsedSettings, admin: selectedNewAdminUsername };
         localStorage.setItem(`room-${roomId}-settings`, JSON.stringify(updatedSettings));
-        
+
         setRoomData(prev => prev ? { ...prev, adminUsername: selectedNewAdminUsername } : null);
         toast({ title: T.adminChangedToastTitle, description: T.adminChangedToastDescription(selectedNewAdminUsername) });
       } catch (error) {
@@ -194,9 +193,23 @@ export default function RoomLobbyPage() {
       }
     }
   };
-  
+
   const handleStartGame = () => {
-    router.push(`/rooms/${roomId}/play`);
+    // Initialize currentRound to 1 in localStorage settings
+    const storedSettingsRaw = localStorage.getItem(`room-${roomId}-settings`);
+    if (storedSettingsRaw) {
+      try {
+        const parsedSettings: StoredRoomSettings = JSON.parse(storedSettingsRaw);
+        const updatedSettings = { ...parsedSettings, currentRound: 1 };
+        localStorage.setItem(`room-${roomId}-settings`, JSON.stringify(updatedSettings));
+        router.push(`/rooms/${roomId}/play`);
+      } catch (error) {
+        console.error("Error setting initial round in localStorage:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not initialize game round." });
+      }
+    } else {
+        toast({ variant: "destructive", title: "Error", description: T.roomNotFoundToast });
+    }
   };
 
   if (isLoading) {
@@ -204,11 +217,9 @@ export default function RoomLobbyPage() {
   }
 
   if (!roomData) {
-    // This case should ideally be handled by the redirect if settings are not found,
-    // but as a fallback:
     return <PageWrapper><div className="flex justify-center items-center h-full pt-10">{T.roomNotFoundToast}</div></PageWrapper>;
   }
-  
+
   return (
     <PageWrapper>
       <div className="max-w-3xl mx-auto">
@@ -220,7 +231,7 @@ export default function RoomLobbyPage() {
             <CardDescription>{T.lobbyDescription}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            
+
             <div className="grid md:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
@@ -242,9 +253,9 @@ export default function RoomLobbyPage() {
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-1 text-sm max-h-48 overflow-y-auto">
-                    {roomData.players.map(player => (
+                    {roomData.players.sort((a,b) => b.score - a.score).map(player => (
                       <li key={player.id || player.name} className={`p-2 rounded ${player.name === username ? 'bg-accent/30 font-semibold' : ''}`}>
-                        {player.name} {player.name === roomData.adminUsername ? <span className="text-xs text-primary font-bold">{T.adminTag}</span> : ''}
+                        {player.name} {player.name === roomData.adminUsername ? <span className="text-xs text-primary font-bold">{T.adminTag}</span> : ''} ({player.score} pts)
                       </li>
                     ))}
                   </ul>
@@ -262,8 +273,8 @@ export default function RoomLobbyPage() {
                 <CardContent className="space-y-3">
                   <div>
                     <Label htmlFor="admin-select" className="text-sm font-medium">{T.assignNewAdminLabel}</Label>
-                    <Select 
-                      value={selectedNewAdminUsername} 
+                    <Select
+                      value={selectedNewAdminUsername}
                       onValueChange={setSelectedNewAdminUsername}
                     >
                       <SelectTrigger id="admin-select" className="w-full mt-1">
@@ -278,8 +289,8 @@ export default function RoomLobbyPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button 
-                    onClick={handleAdminChange} 
+                  <Button
+                    onClick={handleAdminChange}
                     className="w-full"
                     disabled={!selectedNewAdminUsername || selectedNewAdminUsername === roomData.adminUsername || roomData.players.length <=1}
                   >
@@ -309,4 +320,3 @@ export default function RoomLobbyPage() {
     </PageWrapper>
   );
 }
-
