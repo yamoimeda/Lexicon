@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 interface Player {
   id: string;
   name: string;
-  // score: number; // Score might not be relevant in lobby or always 0 initially
+  score: number; 
 }
 
 interface StoredRoomSettings {
@@ -62,6 +62,7 @@ const translations = {
     roomNotFoundToast: "Room not found or settings are missing.",
     secondsSuffix: "s",
     playerCount: (count: number) => `(${count})`,
+    errorUpdatingAdmin: "Failed to update admin.",
   },
   es: {
     lobbyTitle: "ID de Sala: ",
@@ -85,6 +86,7 @@ const translations = {
     roomNotFoundToast: "Sala no encontrada o ajustes faltantes.",
     secondsSuffix: "s",
     playerCount: (count: number) => `(${count})`,
+    errorUpdatingAdmin: "Error al actualizar el admin.",
   }
 };
 
@@ -108,30 +110,38 @@ export default function RoomLobbyPage() {
       return;
     }
 
-    if (!roomId || !username) return; // Ensure username is available for admin checks
+    if (!roomId || !username) return; 
 
     setIsLoading(true);
     const storedSettingsRaw = localStorage.getItem(`room-${roomId}-settings`);
-    const storedPlayersRaw = localStorage.getItem(`room-${roomId}-players`);
-
+    
     if (storedSettingsRaw) {
       try {
         const parsedSettings: StoredRoomSettings = JSON.parse(storedSettingsRaw);
-        // Ensure players are loaded, default to an array with the admin if not found (basic safeguard)
-        let playersList: Player[] = storedPlayersRaw ? JSON.parse(storedPlayersRaw) : [];
         
-        // Ensure the admin is in the player list if not already
-        if (parsedSettings.admin && !playersList.find(p => p.name === parsedSettings.admin)) {
-           // This is a fallback; ideally, player list is managed robustly.
-           // For now, if admin is not in players list, we add them with a generic ID.
-           // This situation should be rare if room creation/joining logic is correct.
-           // playersList.push({ id: `admin-${Date.now()}`, name: parsedSettings.admin });
-        }
-         if (playersList.length === 0 && parsedSettings.admin) {
-          // If players list is empty but admin exists in settings, add admin to players list
-           playersList.push({ id: 'creator', name: parsedSettings.admin });
+        let playersList: Player[] = [];
+        const storedPlayersRaw = localStorage.getItem(`room-${roomId}-players`);
+        if (storedPlayersRaw) {
+            try {
+                playersList = JSON.parse(storedPlayersRaw);
+            } catch (e) {
+                console.error("Error parsing players list from localStorage", e);
+                playersList = []; // Initialize with empty list if parsing fails
+            }
         }
 
+        // Ensure current user is in the player list
+        if (username && !playersList.find(p => p.name === username)) {
+            playersList.push({ id: username, name: username, score: 0 }); 
+            localStorage.setItem(`room-${roomId}-players`, JSON.stringify(playersList));
+        }
+        
+        // Safeguard: Ensure admin (creator) is in the player list if they somehow got removed
+        // This should ideally not happen if room creation is robust
+        if (parsedSettings.admin && !playersList.find(p => p.name === parsedSettings.admin)) {
+             playersList.push({ id: parsedSettings.admin, name: parsedSettings.admin, score: 0 });
+             localStorage.setItem(`room-${roomId}-players`, JSON.stringify(playersList));
+        }
 
         setRoomData({
           name: parsedSettings.roomName,
@@ -144,7 +154,8 @@ export default function RoomLobbyPage() {
           },
           players: playersList,
         });
-        setSelectedNewAdminUsername(parsedSettings.admin);
+        setSelectedNewAdminUsername(parsedSettings.admin); // Set default for admin selection
+
       } catch (error) {
         console.error("Error parsing room data from localStorage:", error);
         toast({ variant: "destructive", title: "Error", description: T.roomNotFoundToast });
@@ -173,7 +184,7 @@ export default function RoomLobbyPage() {
         toast({ title: T.adminChangedToastTitle, description: T.adminChangedToastDescription(selectedNewAdminUsername) });
       } catch (error) {
         console.error("Error updating admin in localStorage:", error);
-        toast({ variant: "destructive", title: "Error", description: "Failed to update admin." });
+        toast({ variant: "destructive", title: "Error", description: T.errorUpdatingAdmin });
       }
     }
   };
@@ -187,7 +198,6 @@ export default function RoomLobbyPage() {
   }
 
   if (!roomData) {
-    // This case should ideally be handled by redirecting in useEffect, but as a fallback:
     return <PageWrapper><div className="flex justify-center items-center h-full pt-10">{T.roomNotFoundToast}</div></PageWrapper>;
   }
   
@@ -263,7 +273,7 @@ export default function RoomLobbyPage() {
                   <Button 
                     onClick={handleAdminChange} 
                     className="w-full"
-                    disabled={selectedNewAdminUsername === roomData.adminUsername || roomData.players.length <=1}
+                    disabled={selectedNewAdminUsername === roomData.adminUsername || roomData.players.length <=1 || !selectedNewAdminUsername}
                   >
                     {T.makeAdminButton}
                   </Button>
@@ -291,4 +301,3 @@ export default function RoomLobbyPage() {
     </PageWrapper>
   );
 }
-
