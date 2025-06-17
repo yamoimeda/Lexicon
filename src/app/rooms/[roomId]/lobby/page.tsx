@@ -1,3 +1,4 @@
+
 // src/app/rooms/[roomId]/lobby/page.tsx
 "use client";
 
@@ -105,14 +106,20 @@ export default function RoomLobbyPage() {
   const T = translations[uiLanguage as keyof typeof translations] || translations.en;
 
   useEffect(() => {
+    setIsLoading(true);
+
     if (!isAuthenticated) {
       router.replace('/login');
+      setIsLoading(false);
       return;
     }
 
-    if (!roomId || !username) return; 
+    if (!roomId || !username) {
+      // Still waiting for roomId or username to be available
+      // isLoading remains true, so "Loading room details..." will be shown
+      return;
+    }
 
-    setIsLoading(true);
     const storedSettingsRaw = localStorage.getItem(`room-${roomId}-settings`);
     
     if (storedSettingsRaw) {
@@ -126,18 +133,15 @@ export default function RoomLobbyPage() {
                 playersList = JSON.parse(storedPlayersRaw);
             } catch (e) {
                 console.error("Error parsing players list from localStorage", e);
-                playersList = []; // Initialize with empty list if parsing fails
+                playersList = []; 
             }
         }
 
-        // Ensure current user is in the player list
         if (username && !playersList.find(p => p.name === username)) {
             playersList.push({ id: username, name: username, score: 0 }); 
             localStorage.setItem(`room-${roomId}-players`, JSON.stringify(playersList));
         }
         
-        // Safeguard: Ensure admin (creator) is in the player list if they somehow got removed
-        // This should ideally not happen if room creation is robust
         if (parsedSettings.admin && !playersList.find(p => p.name === parsedSettings.admin)) {
              playersList.push({ id: parsedSettings.admin, name: parsedSettings.admin, score: 0 });
              localStorage.setItem(`room-${roomId}-players`, JSON.stringify(playersList));
@@ -154,7 +158,9 @@ export default function RoomLobbyPage() {
           },
           players: playersList,
         });
-        setSelectedNewAdminUsername(parsedSettings.admin); // Set default for admin selection
+        if (parsedSettings.admin) {
+          setSelectedNewAdminUsername(parsedSettings.admin); 
+        }
 
       } catch (error) {
         console.error("Error parsing room data from localStorage:", error);
@@ -166,7 +172,7 @@ export default function RoomLobbyPage() {
       router.replace('/');
     }
     setIsLoading(false);
-  }, [roomId, isAuthenticated, router, username, toast, T.roomNotFoundToast, T]);
+  }, [roomId, isAuthenticated, router, username, toast, T]); // T is included as its content depends on uiLanguage
 
   const isCurrentUserAdmin = roomData?.adminUsername === username;
 
@@ -198,6 +204,8 @@ export default function RoomLobbyPage() {
   }
 
   if (!roomData) {
+    // This case should ideally be handled by the redirect if settings are not found,
+    // but as a fallback:
     return <PageWrapper><div className="flex justify-center items-center h-full pt-10">{T.roomNotFoundToast}</div></PageWrapper>;
   }
   
@@ -273,7 +281,7 @@ export default function RoomLobbyPage() {
                   <Button 
                     onClick={handleAdminChange} 
                     className="w-full"
-                    disabled={selectedNewAdminUsername === roomData.adminUsername || roomData.players.length <=1 || !selectedNewAdminUsername}
+                    disabled={!selectedNewAdminUsername || selectedNewAdminUsername === roomData.adminUsername || roomData.players.length <=1}
                   >
                     {T.makeAdminButton}
                   </Button>
@@ -287,7 +295,7 @@ export default function RoomLobbyPage() {
                 {T.startGameButton}
               </Button>
             )}
-            {!isCurrentUserAdmin && (
+            {!isCurrentUserAdmin && roomData.adminUsername && (
               <p className="text-center text-muted-foreground p-4 bg-muted rounded-md">
                 {T.waitingForAdmin(roomData.adminUsername)}
               </p>
@@ -301,3 +309,4 @@ export default function RoomLobbyPage() {
     </PageWrapper>
   );
 }
+

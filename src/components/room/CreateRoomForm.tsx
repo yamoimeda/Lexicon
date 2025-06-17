@@ -1,3 +1,4 @@
+
 // src/components/room/CreateRoomForm.tsx
 "use client";
 
@@ -46,6 +47,7 @@ const translations = {
     toastCreationFailedTitle: "Failed to create room",
     toastCreationFailedDescription: "Could not save room settings locally. Please try again.",
     defaultCategoriesPlaceholder: "e.g., Animals, Countries, Fruits",
+    usernameNotAvailableError: "Username not available. Cannot create room.",
   },
   es: {
     customizeTitle: "Personaliza Tu Juego",
@@ -67,6 +69,7 @@ const translations = {
     toastCreationFailedTitle: "Error al crear la sala",
     toastCreationFailedDescription: "No se pudieron guardar los ajustes de la sala localmente. Por favor, inténtalo de nuevo.",
     defaultCategoriesPlaceholder: "ej: Animales, Países, Frutas",
+    usernameNotAvailableError: "Nombre de usuario no disponible. No se puede crear la sala.",
   }
 };
 
@@ -85,8 +88,8 @@ export default function CreateRoomForm() {
   const { toast } = useToast();
   const T = translations[uiLanguage as keyof typeof translations] || translations.en;
   
-  const getTranslatedDefaultCategories = (lang: string): string => {
-    const categories = defaultCategories[lang as keyof typeof defaultCategories] || defaultCategories.en;
+  const getTranslatedDefaultCategories = (langKey: string): string => {
+    const categories = defaultCategories[langKey as keyof typeof defaultCategories] || defaultCategories.en;
     return categories.join(', ');
   };
 
@@ -103,7 +106,7 @@ export default function CreateRoomForm() {
       ...prev,
       language: mapUiLangToGameLang(uiLanguage),
       categories: getTranslatedDefaultCategories(uiLanguage),
-      roomName: `${username || 'Player'}'s Game`, // Also update room name if username changes or becomes available
+      roomName: `${username || 'Player'}'s Game`,
     }));
   }, [uiLanguage, username]);
 
@@ -119,10 +122,18 @@ export default function CreateRoomForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!username) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: T.usernameNotAvailableError,
+      });
+      return;
+    }
     const roomId = generateRoomId();
     try {
       localStorage.setItem(`room-${roomId}-settings`, JSON.stringify({...settings, admin: username}));
-      localStorage.setItem(`room-${roomId}-players`, JSON.stringify([{id: "creator", name: username, score: 0}])); 
+      localStorage.setItem(`room-${roomId}-players`, JSON.stringify([{id: username, name: username, score: 0}])); 
       toast({
         title: T.toastRoomCreatedTitle,
         description: T.toastRoomCreatedDescription(settings.roomName, roomId),
@@ -202,3 +213,4 @@ export default function CreateRoomForm() {
     </Card>
   );
 }
+
