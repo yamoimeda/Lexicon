@@ -20,6 +20,11 @@ interface RoomSettings {
   language: string; // Game content language
 }
 
+const defaultCategories = {
+  en: ["Animals", "Countries", "Fruits", "Colors", "Sports"],
+  es: ["Animales", "Países", "Frutas", "Colores", "Deportes"],
+};
+
 const translations = {
   en: {
     customizeTitle: "Customize Your Game",
@@ -40,6 +45,7 @@ const translations = {
     toastRoomCreatedDescription: (roomName: string, roomId: string) => `Room ${roomName} (ID: ${roomId}) is ready.`,
     toastCreationFailedTitle: "Failed to create room",
     toastCreationFailedDescription: "Could not save room settings locally. Please try again.",
+    defaultCategoriesPlaceholder: "e.g., Animals, Countries, Fruits",
   },
   es: {
     customizeTitle: "Personaliza Tu Juego",
@@ -60,12 +66,12 @@ const translations = {
     toastRoomCreatedDescription: (roomName: string, roomId: string) => `La sala ${roomName} (ID: ${roomId}) está lista.`,
     toastCreationFailedTitle: "Error al crear la sala",
     toastCreationFailedDescription: "No se pudieron guardar los ajustes de la sala localmente. Por favor, inténtalo de nuevo.",
+    defaultCategoriesPlaceholder: "ej: Animales, Países, Frutas",
   }
 };
 
 const generateRoomId = () => Math.random().toString(36).substring(2, 8).toUpperCase();
 
-// Helper to map UI language code to Game Content Language string
 const mapUiLangToGameLang = (uiLang: string): string => {
   if (uiLang === 'es') {
     return 'Spanish';
@@ -75,22 +81,31 @@ const mapUiLangToGameLang = (uiLang: string): string => {
 
 export default function CreateRoomForm() {
   const router = useRouter();
-  const { username, language: uiLanguage } = useUser(); // uiLanguage is 'en', 'es', etc.
+  const { username, language: uiLanguage } = useUser(); 
   const { toast } = useToast();
   const T = translations[uiLanguage as keyof typeof translations] || translations.en;
   
+  const getTranslatedDefaultCategories = (lang: string): string => {
+    const categories = defaultCategories[lang as keyof typeof defaultCategories] || defaultCategories.en;
+    return categories.join(', ');
+  };
+
   const [settings, setSettings] = useState<RoomSettings>({
     roomName: `${username || 'Player'}'s Game`,
     numberOfRounds: 3,
     timePerRound: 60,
-    categories: "Animals, Countries, Fruits, Colors, Sports",
-    language: mapUiLangToGameLang(uiLanguage), // Game content language, e.g., "English", "Spanish"
+    categories: getTranslatedDefaultCategories(uiLanguage),
+    language: mapUiLangToGameLang(uiLanguage),
   });
 
-  // Update game language if UI language changes after component mount
   useEffect(() => {
-    setSettings(prev => ({ ...prev, language: mapUiLangToGameLang(uiLanguage) }));
-  }, [uiLanguage]);
+    setSettings(prev => ({
+      ...prev,
+      language: mapUiLangToGameLang(uiLanguage),
+      categories: getTranslatedDefaultCategories(uiLanguage),
+      roomName: `${username || 'Player'}'s Game`, // Also update room name if username changes or becomes available
+    }));
+  }, [uiLanguage, username]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -106,9 +121,8 @@ export default function CreateRoomForm() {
     e.preventDefault();
     const roomId = generateRoomId();
     try {
-      // Store settings including admin and the explicitly set gameLanguage
-      localStorage.setItem(`room-${roomId}-settings`, JSON.stringify({...settings, admin: username, gameLanguage: settings.language}));
-      localStorage.setItem(`room-${roomId}-players`, JSON.stringify([{id: "1", name: username, score: 0}])); 
+      localStorage.setItem(`room-${roomId}-settings`, JSON.stringify({...settings, admin: username}));
+      localStorage.setItem(`room-${roomId}-players`, JSON.stringify([{id: "creator", name: username, score: 0}])); 
       toast({
         title: T.toastRoomCreatedTitle,
         description: T.toastRoomCreatedDescription(settings.roomName, roomId),
@@ -155,7 +169,7 @@ export default function CreateRoomForm() {
               name="categories" 
               value={settings.categories} 
               onChange={handleChange} 
-              placeholder="e.g., Animals, Countries, Fruits" 
+              placeholder={T.defaultCategoriesPlaceholder}
               required 
               className="mt-1"
             />
