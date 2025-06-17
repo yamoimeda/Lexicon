@@ -39,9 +39,8 @@ export default function CreateRoomPage() {
   return (
     <PageWrapper>
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-4xl font-headline font-bold text-primary mb-8 text-center">{T.pageTitle}</h1>
-        <CreateRoomForm />
-        <div className="mt-8 text-center">
+        <h1 className="text-4xl font-headline font-bold text-primary mb-4 text-center">{T.pageTitle}</h1>
+        <div className="mb-8 text-center">
           <Button asChild variant="outline">
             <Link href="/">
               <Home className="mr-2 h-4 w-4" />
@@ -49,6 +48,7 @@ export default function CreateRoomPage() {
             </Link>
           </Button>
         </div>
+        <CreateRoomForm />
       </div>
     </PageWrapper>
   );
