@@ -13,30 +13,33 @@ export const useGameRoom = (roomId: string) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
   // Generar o recuperar ID único para el usuario
   useEffect(() => {
+    console.log('🔍 useGameRoom - Effect 1: Generating userId', { username, roomId });
     if (!username) return;
     
     // Intentar recuperar ID almacenado localmente para este usuario y sala
     const storedUserId = localStorage.getItem(`userId_${roomId}_${username}`);
     
     if (storedUserId) {
+      console.log('✅ useGameRoom - Using stored userId:', storedUserId);
       setCurrentUserId(storedUserId);
     } else {
       // Generar nuevo ID único
       const newUserId = generateUniqueUserId(username);
+      console.log('🆕 useGameRoom - Generated new userId:', newUserId);
       localStorage.setItem(`userId_${roomId}_${username}`, newUserId);
       setCurrentUserId(newUserId);
     }
   }, [username, roomId]);
-
   // Suscribirse a cambios en la sala
   useEffect(() => {
+    console.log('🏠 useGameRoom - Effect 2: Room subscription', { roomId });
     if (!roomId) return;
 
     setLoading(true);
     const unsubscribe = GameService.subscribeToRoom(roomId, (roomData) => {
+      console.log('📡 useGameRoom - Room data received:', roomData ? 'Room exists' : 'Room not found');
       setRoom(roomData);
       setLoading(false);
       if (!roomData) {
@@ -46,27 +49,37 @@ export const useGameRoom = (roomId: string) => {
 
     return unsubscribe;
   }, [roomId]);
-
   // Suscribirse a cambios en la ronda actual
   useEffect(() => {
+    console.log('🎯 useGameRoom - Effect 3: Round subscription', { 
+      hasRoom: !!room, 
+      currentRound: room?.settings.currentRound 
+    });
     if (!room || !room.settings.currentRound) return;
 
     const unsubscribe = GameService.subscribeToRound(
       roomId, 
       room.settings.currentRound, 
       (roundData) => {
+        console.log('📊 useGameRoom - Round data received:', roundData ? 'Round exists' : 'Round not found');
         setCurrentRound(roundData);
       }
     );
 
     return unsubscribe;
-  }, [roomId, room?.settings.currentRound]);
-  // Verificar si el usuario actual es admin
+  }, [roomId, room?.settings.currentRound]);  // Verificar si el usuario actual es admin
   const isAdmin = useCallback(() => {
+    console.log('👑 useGameRoom - isAdmin called', { 
+      hasRoom: !!room, 
+      currentUserId, 
+      roomAdmin: room?.settings.admin,
+      username 
+    });
     if (!room || !currentUserId) return false;
     return room.settings.admin === currentUserId || extractUsernameFromId(room.settings.admin) === username;
   }, [room, currentUserId, username]);  // Unirse a la sala
   const joinRoom = useCallback(async () => {
+    console.log('🚪 useGameRoom - joinRoom called', { username, roomId, currentUserId });
     if (!username || !roomId || !currentUserId) return;
 
     try {
@@ -74,6 +87,7 @@ export const useGameRoom = (roomId: string) => {
       const roomSnap = await getDoc(roomRef);
       
       if (!roomSnap.exists()) {
+        console.log('❌ useGameRoom - Room not found');
         throw new Error('Room not found');
       }
 
@@ -81,11 +95,13 @@ export const useGameRoom = (roomId: string) => {
       
       // Verificar si el usuario ya está en la sala
       if (currentRoom.players.find((p: Player) => p.id === currentUserId)) {
+        console.log('✅ useGameRoom - User already in room');
         return; // Ya está en la sala
       }
 
       // Generar nombre para mostrar que evite conflictos
       const displayName = generateDisplayName(username, currentRoom.players);
+      console.log('🏷️ useGameRoom - Generated display name:', displayName);
 
       const player: Player = {
         id: currentUserId,
@@ -94,8 +110,11 @@ export const useGameRoom = (roomId: string) => {
         joinedAt: new Date()
       };
       
+      console.log('🎮 useGameRoom - Joining room with player:', player);
       await GameService.joinRoom(roomId, player);
+      console.log('✅ useGameRoom - Successfully joined room');
     } catch (err) {
+      console.error('❌ useGameRoom - Error joining room:', err);
       setError(err instanceof Error ? err.message : 'Failed to join room');
     }
   }, [roomId, username, currentUserId]);

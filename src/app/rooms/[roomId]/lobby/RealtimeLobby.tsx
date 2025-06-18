@@ -78,11 +78,15 @@ const translations = {
 };
 
 export default function RealtimeLobby({ roomId }: RealtimeLobbyProps) {
+  console.log('🏠 RealtimeLobby - Component rendering', { roomId });
+  
   const { username, language: uiLanguage } = useUser();
   const router = useRouter();
   const T = translations[uiLanguage as keyof typeof translations] || translations.en;
   const hasJoined = useRef(false);
   const hasRedirected = useRef(false);
+
+  console.log('👤 RealtimeLobby - User context', { username, uiLanguage });
 
   const {
     room,
@@ -94,9 +98,25 @@ export default function RealtimeLobby({ roomId }: RealtimeLobbyProps) {
     leaveRoom
   } = useGameRoom(roomId);
 
+  console.log('🎯 RealtimeLobby - Hook state', { 
+    hasRoom: !!room, 
+    loading, 
+    error, 
+    gameStatus: room?.settings?.gameStatus,
+    hasJoined: hasJoined.current,
+    hasRedirected: hasRedirected.current
+  });
   // Auto-join cuando se monta el componente (solo una vez)
   useEffect(() => {
+    console.log('🚪 RealtimeLobby - Effect 1: Auto-join check', { 
+      roomId, 
+      username, 
+      hasJoined: hasJoined.current, 
+      loading 
+    });
+    
     if (roomId && username && !hasJoined.current && !loading) {
+      console.log('🎯 RealtimeLobby - Executing joinRoom');
       hasJoined.current = true;
       joinRoom();
     }
@@ -104,7 +124,14 @@ export default function RealtimeLobby({ roomId }: RealtimeLobbyProps) {
 
   // Redirigir cuando el juego comience (solo una vez)
   useEffect(() => {
+    console.log('🎮 RealtimeLobby - Effect 2: Game status check', { 
+      gameStatus: room?.settings.gameStatus, 
+      hasRedirected: hasRedirected.current,
+      roomId 
+    });
+    
     if (room?.settings.gameStatus === 'playing' && !hasRedirected.current) {
+      console.log('🔄 RealtimeLobby - Redirecting to play');
       hasRedirected.current = true;
       router.push(`/rooms/${roomId}/play`);
     }

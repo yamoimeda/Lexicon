@@ -80,13 +80,14 @@ export class GameService {
 
     await setDoc(doc(db, 'rooms', roomId), room);
   }
-
   // Unirse a una sala
   static async joinRoom(roomId: string, player: Player): Promise<void> {
+    console.log('🚪 GameService - joinRoom called', { roomId, playerId: player.id, playerName: player.name });
     const roomRef = doc(db, 'rooms', roomId);
     const roomSnap = await getDoc(roomRef);
     
     if (!roomSnap.exists()) {
+      console.log('❌ GameService - Room not found');
       throw new Error('Room not found');
     }
 
@@ -94,10 +95,14 @@ export class GameService {
     
     // Verificar que el jugador no esté ya en la sala
     if (!room.players.find(p => p.id === player.id)) {
+      console.log('✅ GameService - Adding player to room');
       await updateDoc(roomRef, {
         players: arrayUnion({ ...player, joinedAt: new Date() }),
         updatedAt: new Date()
       });
+      console.log('✅ GameService - Player successfully added');
+    } else {
+      console.log('⚠️ GameService - Player already in room');
     }
   }
 
@@ -210,11 +215,16 @@ export class GameService {
       });
     }
   }
-
   // Escuchar cambios en una sala
   static subscribeToRoom(roomId: string, callback: (room: Room | null) => void): () => void {
+    console.log('📡 GameService - subscribeToRoom called for:', roomId);
     const roomRef = doc(db, 'rooms', roomId);
     return onSnapshot(roomRef, (doc) => {
+      console.log('🏠 GameService - Room snapshot received', { 
+        roomId, 
+        exists: doc.exists(),
+        data: doc.exists() ? 'Room data available' : 'No data'
+      });
       if (doc.exists()) {
         callback(doc.data() as Room);
       } else {
@@ -222,11 +232,17 @@ export class GameService {
       }
     });
   }
-
   // Escuchar cambios en una ronda
   static subscribeToRound(roomId: string, roundNumber: number, callback: (round: RoundData | null) => void): () => void {
+    console.log('🎯 GameService - subscribeToRound called for:', { roomId, roundNumber });
     const roundRef = doc(db, 'rounds', `${roomId}_${roundNumber}`);
     return onSnapshot(roundRef, (doc) => {
+      console.log('📊 GameService - Round snapshot received', { 
+        roomId, 
+        roundNumber,
+        exists: doc.exists(),
+        data: doc.exists() ? 'Round data available' : 'No data'
+      });
       if (doc.exists()) {
         callback(doc.data() as RoundData);
       } else {
