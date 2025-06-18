@@ -52,6 +52,7 @@ interface StoredRoomSettings {
   timePerRound: number;
   categories: string; // Comma-separated
   language: string; // Game language
+  endRoundOnFirstSubmit: boolean;
   admin: string;
   currentRound: number;
 }
@@ -198,6 +199,7 @@ export default function ReviewRoundPage() {
       return;
     }
     setIsLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, roundNumber, username, isAuthenticated, router, toast, T]); // Dependencies intentionally limited
 
   const loadPlayerData = (settings: StoredRoomSettings) => {
@@ -395,12 +397,12 @@ export default function ReviewRoundPage() {
                 const input: ValidateWordInput = { word: sub.word, category: sub.category, language: roomSettings.language };
                 const result = await validateWord(input);
                 finalPlayerSubmissions[i] = { ...sub, isValid: result.isValid, validationReason: result.reason };
-                if (result.isValid) playerScore += 10;
+                if (result.isValid) playerScore += 10; // Player's own validation logic still gives flat 10 points for now. Admin logic is separate.
             } catch(e) {
                  finalPlayerSubmissions[i] = { ...sub, isValid: false, validationReason: "Validation error" };
             }
           } else if (sub.isValid) {
-            playerScore += 10;
+            playerScore += 10; // Player's own validation logic still gives flat 10 points for now. Admin logic is separate.
           }
       }
       setPlayerReviewData(finalPlayerSubmissions);

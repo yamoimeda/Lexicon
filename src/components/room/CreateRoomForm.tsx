@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Settings, Languages, Clock, ListOrdered, Loader2 } from 'lucide-react';
+import { PlusCircle, Settings, Languages, Clock, ListOrdered, Loader2, Zap } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 
 interface RoomSettings {
@@ -19,6 +20,7 @@ interface RoomSettings {
   timePerRound: number; // in seconds
   categories: string; // Comma-separated string
   language: string; // Game content language
+  endRoundOnFirstSubmit: boolean;
 }
 
 const defaultCategories = {
@@ -41,6 +43,8 @@ const translations = {
     spanish: "Español (Spanish)",
     french: "Français (French)",
     german: "Deutsch (German)",
+    endRoundOnFirstSubmitLabel: "Quick Finish",
+    endRoundOnFirstSubmitDescription: "If active, round ends for all when one player submits. If inactive, round ends on timer.",
     createRoomButton: "Create Room",
     creatingRoomButton: "Creating Room...",
     toastRoomCreatedTitle: "Room Created!",
@@ -64,6 +68,8 @@ const translations = {
     spanish: "Español",
     french: "Francés (French)",
     german: "Alemán (German)",
+    endRoundOnFirstSubmitLabel: "Final Rápido",
+    endRoundOnFirstSubmitDescription: "Si está activo, la ronda termina para todos cuando un jugador envía. Si está inactivo, la ronda termina con el temporizador.",
     createRoomButton: "Crear Sala",
     creatingRoomButton: "Creando Sala...",
     toastRoomCreatedTitle: "¡Sala Creada!",
@@ -106,6 +112,7 @@ export default function CreateRoomForm() {
       timePerRound: 60,
       categories: initialCategories,
       language: initialGameLanguage,
+      endRoundOnFirstSubmit: false, // Default to false
     };
   });
 
@@ -115,6 +122,7 @@ export default function CreateRoomForm() {
       language: mapUiLangToGameLang(uiLanguage),
       categories: getTranslatedDefaultCategories(uiLanguage),
       roomName: `${username || 'Player'}'s Game`,
+      // Keep endRoundOnFirstSubmit as is, or reset if needed based on uiLanguage (if applicable)
     }));
   }, [uiLanguage, username, getTranslatedDefaultCategories]);
 
@@ -127,6 +135,11 @@ export default function CreateRoomForm() {
   const handleSelectChange = (name: keyof RoomSettings, value: string) => {
     setSettings(prev => ({ ...prev, [name]: value }));
   };
+
+  const handleSwitchChange = (name: keyof RoomSettings, checked: boolean) => {
+    setSettings(prev => ({ ...prev, [name]: checked as any })); // Cast to any to satisfy type for boolean
+  };
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -220,6 +233,23 @@ export default function CreateRoomForm() {
             <p className="text-xs text-muted-foreground mt-1">This sets the language for word validation and suggestions during the game.</p>
           </div>
 
+          <div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="endRoundOnFirstSubmit" className="font-semibold flex items-center">
+                <Zap className="mr-2 h-4 w-4 text-muted-foreground"/>
+                {T.endRoundOnFirstSubmitLabel}
+              </Label>
+              <Switch
+                id="endRoundOnFirstSubmit"
+                checked={settings.endRoundOnFirstSubmit}
+                onCheckedChange={(checked) => handleSwitchChange('endRoundOnFirstSubmit', checked)}
+                disabled={isCreating}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">{T.endRoundOnFirstSubmitDescription}</p>
+          </div>
+
+
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-3" disabled={isCreating}>
@@ -239,3 +269,4 @@ export default function CreateRoomForm() {
     </Card>
   );
 }
+

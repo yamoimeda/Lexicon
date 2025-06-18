@@ -23,6 +23,7 @@ interface StoredRoomSettings {
   timePerRound: number;
   categories: string;
   language: string;
+  endRoundOnFirstSubmit: boolean;
   admin: string;
   currentRound: number;
 }

@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { ArrowRight, Info, Users, Settings, Play, UserCog } from 'lucide-react';
+import { ArrowRight, Info, Users, Settings, Play, UserCog, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Player {
@@ -25,6 +25,7 @@ interface StoredRoomSettings {
   timePerRound: number;
   categories: string; // Comma-separated string
   language: string; // Game content language, e.g., "English"
+  endRoundOnFirstSubmit: boolean;
   admin: string; // Admin's username
   currentRound?: number; // Added for game flow
 }
@@ -37,6 +38,7 @@ interface DisplayRoomDetails {
     timePerRound: number;
     categories: string[];
     language: string;
+    endRoundOnFirstSubmit: boolean;
   };
   players: Player[];
 }
@@ -50,6 +52,9 @@ const translations = {
     timePerRound: "Time/Round:",
     language: "Language:",
     categories: "Categories:",
+    endRoundOnFirstSubmitLabelShort: "Quick Finish:",
+    yes: "Yes",
+    no: "No",
     playersTitle: "Players",
     adminTag: "(Admin)",
     adminToolsTitle: "Admin Tools",
@@ -74,6 +79,9 @@ const translations = {
     timePerRound: "Tiempo/Ronda:",
     language: "Idioma:",
     categories: "Categorías:",
+    endRoundOnFirstSubmitLabelShort: "Final Rápido:",
+    yes: "Sí",
+    no: "No",
     playersTitle: "Jugadores",
     adminTag: "(Admin)",
     adminToolsTitle: "Herramientas de Admin",
@@ -154,6 +162,7 @@ export default function RoomLobbyPage() {
             timePerRound: parsedSettings.timePerRound,
             categories: parsedSettings.categories.split(',').map(c => c.trim()),
             language: parsedSettings.language,
+            endRoundOnFirstSubmit: parsedSettings.endRoundOnFirstSubmit || false, // Default to false if not present
           },
           players: playersList,
         });
@@ -242,6 +251,13 @@ export default function RoomLobbyPage() {
                   <p><strong>{T.timePerRound}</strong> {roomData.settings.timePerRound}{T.secondsSuffix}</p>
                   <p><strong>{T.language}</strong> {roomData.settings.language}</p>
                   <p><strong>{T.categories}</strong> {roomData.settings.categories.join(', ')}</p>
+                  <p className="flex items-center">
+                    <Zap className="mr-1 h-4 w-4 text-muted-foreground"/>
+                    <strong>{T.endRoundOnFirstSubmitLabelShort}</strong> 
+                    <span className={`ml-1 px-2 py-0.5 rounded text-xs ${roomData.settings.endRoundOnFirstSubmit ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {roomData.settings.endRoundOnFirstSubmit ? T.yes : T.no}
+                    </span>
+                  </p>
                 </CardContent>
               </Card>
 
@@ -320,3 +336,4 @@ export default function RoomLobbyPage() {
     </PageWrapper>
   );
 }
+

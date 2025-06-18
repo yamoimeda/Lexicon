@@ -37,6 +37,7 @@ interface RoomSettingsData {
   gameLanguage: string;
   admin: string;
   currentRound: number;
+  endRoundOnFirstSubmit: boolean;
 }
 
 interface StoredRoomSettings {
@@ -45,6 +46,7 @@ interface StoredRoomSettings {
   timePerRound: number;
   categories: string;
   language: string;
+  endRoundOnFirstSubmit: boolean;
   admin: string;
   currentRound: number;
 }
@@ -156,6 +158,7 @@ export default function GamePage() {
           gameLanguage: parsedSettings.language,
           admin: parsedSettings.admin,
           currentRound: parsedSettings.currentRound,
+          endRoundOnFirstSubmit: parsedSettings.endRoundOnFirstSubmit || false,
         };
         setRoomSettings(loadedSettings);
         setTimeLeft(loadedSettings.timePerRound);
@@ -359,9 +362,11 @@ export default function GamePage() {
                     )}
                   </Card>
                 ))}
-                <Button type="submit" className="w-full text-lg py-3 bg-primary hover:bg-primary/90" disabled={isSubmitting || timeLeft === 0}>
-                  <Send className="mr-2 h-5 w-5"/> {isSubmitting ? T.submitting : T.submitWordsForRound}
-                </Button>
+                {roomSettings.endRoundOnFirstSubmit && (
+                  <Button type="submit" className="w-full text-lg py-3 bg-primary hover:bg-primary/90" disabled={isSubmitting || timeLeft === 0}>
+                    <Send className="mr-2 h-5 w-5"/> {isSubmitting ? T.submitting : T.submitWordsForRound}
+                  </Button>
+                )}
               </form>
             </CardContent>
           </Card>
