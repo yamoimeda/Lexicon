@@ -198,13 +198,18 @@ Este proyecto está construido con tecnologías de vanguardia para una experienc
 3. **Configura Firebase**
    - Crea un proyecto en Firebase Console
    - Configura Authentication, Firestore y Hosting
-   - Añade tu configuración en las variables de entorno
+   - Ver guía completa: [CONFIGURACION-FIREBASE.md](./CONFIGURACION-FIREBASE.md)
 
-4. **Configura la IA**
-   - Obtén una API key de Google AI
-   - Configura las variables de entorno necesarias
+4. **Configura variables de entorno**
+   ```bash
+   # Copia el archivo de ejemplo
+   cp .env.local.example .env.local
+   
+   # Edita .env.local con tus credenciales de Firebase
+   # Obtén las credenciales desde Firebase Console → Project Settings → Your apps
+   ```
 
-5. **Inicia el servidor de desarrollo**
+5. **Ejecuta el proyecto**
    ```bash
    npm run dev
    ```
