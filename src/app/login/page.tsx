@@ -10,11 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 
 const translations = {
   en: {
-    pageTitle: "Welcome to WordDuel!",
+    pageTitle: "Welcome to Lexicon!",
     pageDescription: "Enter your username to play.",
   },
   es: {
-    pageTitle: "¡Bienvenido a WordDuel!",
+    pageTitle: "¡Bienvenido a Lexicon!",
     pageDescription: "Ingresa tu nombre de usuario para jugar.",
   }
 };
