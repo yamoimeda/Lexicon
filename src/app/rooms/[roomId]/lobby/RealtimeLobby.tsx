@@ -1,7 +1,7 @@
 // src/app/rooms/[roomId]/lobby/RealtimeLobby.tsx
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import PageWrapper from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/button';
@@ -81,6 +81,7 @@ export default function RealtimeLobby({ roomId }: RealtimeLobbyProps) {
   const { username, language: uiLanguage } = useUser();
   const router = useRouter();
   const T = translations[uiLanguage as keyof typeof translations] || translations.en;
+  const hasJoined = useRef(false);
 
   const {
     room,
@@ -90,14 +91,13 @@ export default function RealtimeLobby({ roomId }: RealtimeLobbyProps) {
     joinRoom,
     startRound,
     leaveRoom
-  } = useGameRoom(roomId);
-
-  // Auto-join cuando se monta el componente
+  } = useGameRoom(roomId);  // Auto-join cuando se monta el componente (solo una vez)
   useEffect(() => {
-    if (roomId && username) {
-      joinRoom();
+    if (roomId && username && !hasJoined.current && !loading) {
+      hasJoined.current = true;
+      joinRoom(); // Llamar la función aquí
     }
-  }, [roomId, username, joinRoom]);
+  }, [roomId, username, loading]); // Removido joinRoom de dependencias
 
   // Redirigir cuando el juego comience
   useEffect(() => {

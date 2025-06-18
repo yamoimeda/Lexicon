@@ -63,8 +63,7 @@ export const useGameRoom = (roomId: string) => {
   const isAdmin = useCallback(() => {
     if (!room || !currentUserId) return false;
     return room.settings.admin === currentUserId || extractUsernameFromId(room.settings.admin) === username;
-  }, [room, currentUserId, username]);
-  // Unirse a la sala
+  }, [room, currentUserId, username]);  // Unirse a la sala
   const joinRoom = useCallback(async () => {
     if (!username || !roomId || !currentUserId) return;
 
@@ -86,7 +85,7 @@ export const useGameRoom = (roomId: string) => {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join room');
     }
-  }, [roomId, username, currentUserId, room]);
+  }, [roomId, username, currentUserId]); // Removido 'room' de las dependencias
   // Salir de la sala
   const leaveRoom = useCallback(async () => {
     if (!currentUserId || !roomId) return;
