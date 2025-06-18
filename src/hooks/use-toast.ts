@@ -9,7 +9,7 @@ import type {
 } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 5000 // 5 segundos en lugar de 1,000,000ms
 
 type ToasterToast = ToastProps & {
   id: string
@@ -75,6 +75,11 @@ const addToRemoveQueue = (toastId: string) => {
 }
 
 export const reducer = (state: State, action: Action): State => {
+  console.log('🍞 Toast reducer called:', action.type, { 
+    currentToasts: state.toasts.length,
+    action 
+  });
+  
   switch (action.type) {
     case "ADD_TOAST":
       return {
@@ -144,6 +149,8 @@ type Toast = Omit<ToasterToast, "id">
 
 function toast({ ...props }: Toast) {
   const id = genId()
+  
+  console.log('🍞 Toast function called:', { id, title: props.title, description: props.description });
 
   const update = (props: ToasterToast) =>
     dispatch({

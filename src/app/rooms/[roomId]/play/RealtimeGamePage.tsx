@@ -72,7 +72,6 @@ const translations = {
 export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
   const { username, language: uiLanguage } = useUser();
   const router = useRouter();
-  const { toast } = useToast();
   const T = translations[uiLanguage as keyof typeof translations] || translations.en;
 
   const {
@@ -128,7 +127,6 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
       )
     );
   }, []);
-
   const handleSubmitWords = useCallback(async () => {
     if (!room || !username || isSubmitting) return;
     
@@ -140,10 +138,8 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
       
       await submitWords(wordsToSubmit);
       
-      toast({
-        title: "Words submitted successfully!",
-        description: "Your words have been sent for review."
-      });
+      // Removed toast notification to avoid infinite loops
+      console.log('✅ Words submitted successfully!');
 
       // Si es modo "endRoundOnFirstSubmit", el juego cambiará automáticamente a reviewing
       // Si no, el usuario puede seguir editando hasta que se acabe el tiempo
@@ -154,15 +150,11 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
       }
       
     } catch (error) {
-      console.error('Error submitting words:', error);
-      toast({
-        variant: "destructive",
-        title: "Error submitting words",
-        description: "Please try again."
-      });
+      console.error('❌ Error submitting words:', error);
+      // Removed toast notification to avoid infinite loops
       setIsSubmitting(false);
     }
-  }, [room, username, wordSubmissions, submitWords, toast, isSubmitting]);
+  }, [room, username, wordSubmissions, submitWords, isSubmitting]);
 
   // Handle time up submission
   const handleTimeUp = useCallback(() => {
