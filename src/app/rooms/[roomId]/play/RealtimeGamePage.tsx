@@ -88,16 +88,15 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Inicializar submissions cuando cambien las categorías
-  useEffect(() => {
-    if (room?.settings.categories) {
-      setWordSubmissions(
-        room.settings.categories.map(category => ({
-          category,
-          word: ""
-        }))
-      );
-    }
-  }, [room?.settings.categories]);
+  useEffect(() => {      if (room?.settings.categories) {
+        setWordSubmissions(
+          room.settings.categories.map((category: string) => ({
+            category,
+            word: ""
+          }))
+        );
+      }
+    }, [room?.settings.categories]);
 
   // Inicializar timer cuando comience la ronda
   useEffect(() => {
@@ -120,24 +119,11 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
       case 'finished':
         router.push(`/rooms/${roomId}/results`);
         break;
-    }
-  }, [room?.settings.gameStatus, room?.settings.currentRound, roomId, router]);
-
-  // Timer countdown
-  useEffect(() => {
-    if (timeLeft > 0 && room?.settings.gameStatus === 'playing' && !isSubmitting) {
-      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-      return () => clearTimeout(timer);
-    } else if (timeLeft === 0 && room?.settings.gameStatus === 'playing' && !isSubmitting) {
-      // Auto-submit cuando se acabe el tiempo
-      toast({ title: T.timeUp });
-      handleSubmitWords();
-    }
-  }, [timeLeft, room?.settings.gameStatus, isSubmitting, T, toast]);
+    }  }, [room?.settings.gameStatus, room?.settings.currentRound, roomId, router]);
 
   const handleWordChange = useCallback((category: string, newWord: string) => {
-    setWordSubmissions(prevWords =>
-      prevWords.map(cw =>
+    setWordSubmissions((prevWords: CategoryWordSubmission[]) =>
+      prevWords.map((cw: CategoryWordSubmission) =>
         cw.category === category ? { ...cw, word: newWord } : cw
       )
     );
@@ -150,7 +136,7 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
     
     try {
       // Filtrar palabras vacías
-      const wordsToSubmit = wordSubmissions.filter(w => w.word.trim() !== '');
+      const wordsToSubmit = wordSubmissions.filter((w: CategoryWordSubmission) => w.word.trim() !== '');
       
       await submitWords(wordsToSubmit);
       
@@ -177,6 +163,23 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
       setIsSubmitting(false);
     }
   }, [room, username, wordSubmissions, submitWords, toast, isSubmitting]);
+
+  // Handle time up submission
+  const handleTimeUp = useCallback(() => {
+    toast({ title: T.timeUp });
+    handleSubmitWords();
+  }, [toast, T.timeUp, handleSubmitWords]);
+
+  // Timer countdown
+  useEffect(() => {
+    if (timeLeft > 0 && room?.settings.gameStatus === 'playing' && !isSubmitting) {
+      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (timeLeft === 0 && room?.settings.gameStatus === 'playing' && !isSubmitting) {
+      // Auto-submit cuando se acabe el tiempo
+      handleTimeUp();
+    }
+  }, [timeLeft, room?.settings.gameStatus, isSubmitting, handleTimeUp]);
 
   if (loading) {
     return (
@@ -247,10 +250,8 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
                 <p className="text-6xl font-headline font-bold tracking-widest text-primary">
                   {room.settings.currentLetter || '?'}
                 </p>
-              </div>
-
-              <form onSubmit={(e) => { e.preventDefault(); handleSubmitWords(); }} className="space-y-4">
-                {wordSubmissions.map((cw, index) => (
+              </div>              <form onSubmit={(e: React.FormEvent) => { e.preventDefault(); handleSubmitWords(); }} className="space-y-4">
+                {wordSubmissions.map((cw: CategoryWordSubmission, index: number) => (
                   <Card key={index} className="p-4">
                     <Label htmlFor={`word-${index}`} className="text-lg font-semibold text-foreground/90">
                       {cw.category}
@@ -260,7 +261,7 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
                         id={`word-${index}`}
                         type="text"
                         value={cw.word}
-                        onChange={(e) => handleWordChange(cw.category, e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleWordChange(cw.category, e.target.value)}
                         placeholder={T.enterCategoryWord(cw.category)}
                         className="flex-grow"
                         disabled={isSubmitting || timeLeft === 0}
