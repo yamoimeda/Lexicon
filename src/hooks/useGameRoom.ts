@@ -84,7 +84,8 @@ export const useGameRoom = (roomId: string) => {
     console.log('👑 useGameRoom - isAdmin computed', { 
       currentUserId,
       adminUserId,
-      username 
+      username,
+      result: adminUserId === currentUserId || (adminUserId && extractUsernameFromId(adminUserId) === username)
     });
     if (!adminUserId || !currentUserId) return false;
     return adminUserId === currentUserId || extractUsernameFromId(adminUserId) === username;
@@ -142,10 +143,9 @@ export const useGameRoom = (roomId: string) => {
       setError(err instanceof Error ? err.message : 'Failed to leave room');
     }
   }, [roomId, currentUserId, username]);
-
   // Iniciar una nueva ronda
   const startRound = useCallback(async (roundNumber: number, letter: string) => {
-    if (!isAdmin()) return;
+    if (!isAdmin) return;
 
     try {
       await GameService.startRound(roomId, roundNumber, letter);
@@ -171,10 +171,9 @@ export const useGameRoom = (roomId: string) => {
       setError(err instanceof Error ? err.message : 'Failed to submit words');
     }
   }, [roomId, currentUserId, username, room, currentRound]);
-
   // Finalizar ronda
   const finalizeRound = useCallback(async (playerScores: Record<string, number>) => {
-    if (!isAdmin() || !room) return;
+    if (!isAdmin || !room) return;
 
     try {
       await GameService.finalizeRound(roomId, room.settings.currentRound, playerScores);
@@ -182,24 +181,22 @@ export const useGameRoom = (roomId: string) => {
       setError(err instanceof Error ? err.message : 'Failed to finalize round');
     }
   }, [roomId, room, isAdmin]);
-
   // Terminar juego
   const finishGame = useCallback(async () => {
-    if (!isAdmin()) return;
+    if (!isAdmin) return;
 
     try {
       await GameService.finishGame(roomId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to finish game');
     }
-  }, [roomId, isAdmin]);
-  return {
+  }, [roomId, isAdmin]);  return {
     room,
     currentRound,
     loading,
     error,
     currentUserId,
-    isAdmin: isAdmin(),
+    isAdmin: isAdmin,
     joinRoom,
     leaveRoom,
     startRound,
