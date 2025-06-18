@@ -2,17 +2,16 @@
 // src/app/rooms/[roomId]/play/page.tsx
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
-import PageWrapper from '@/components/layout/PageWrapper';
-import { useUser } from '@/contexts/UserContext';
-import { useRouter, useParams } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Send, Clock, Users, Gamepad2 } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
-import { useToast } from '@/hooks/use-toast';
+import React from 'react';
+import { useParams } from 'next/navigation';
+import RealtimeGamePage from './RealtimeGamePage';
+
+export default function GamePage() {
+  const params = useParams();
+  const roomId = params.roomId as string;
+
+  return <RealtimeGamePage roomId={roomId} />;
+}
 
 interface Player {
   id: string;

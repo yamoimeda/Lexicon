@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Users, Play, Trophy, ListChecks, ArrowLeftToLine } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useGameRoom } from '@/hooks/useGameRoom';
+import { GameService } from '@/services/gameService';
 
 interface Player {
   id: string;

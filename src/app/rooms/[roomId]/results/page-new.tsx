@@ -1,5 +1,4 @@
-
-// src/app/rooms/[roomId]/results/page.tsx
+// src/app/rooms/[roomId]/results/page-new.tsx
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -10,12 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Trophy, ListOrdered, RotateCcw, Home } from 'lucide-react';
 import { useGameRoom } from '@/hooks/useGameRoom';
+import { Player } from '@/services/gameService';
 
 interface PlayerResult {
   id: string;
   name: string;
   score: number;
-  rank?: number; // Rank will be calculated
+  rank?: number;
 }
 
 const translations = {
@@ -29,6 +29,8 @@ const translations = {
     loadingResults: "Loading results...",
     errorLoadingResults: "Could not load player results.",
     pointsSuffix: "pts",
+    loading: "Loading...",
+    roomNotFound: "Room not found.",
   },
   es: {
     pageTitle: "¡Juego Terminado!",
@@ -40,18 +42,20 @@ const translations = {
     loadingResults: "Cargando resultados...",
     errorLoadingResults: "No se pudieron cargar los resultados de los jugadores.",
     pointsSuffix: "pts",
+    loading: "Cargando...",
+    roomNotFound: "Sala no encontrada.",
   }
 };
 
-export default function ResultsPage() {
+export default function RealtimeResultsPage() {
   const { isAuthenticated, username, language: uiLanguage } = useUser();
   const router = useRouter();
   const params = useParams();
   const roomId = params.roomId as string;
   const T = translations[uiLanguage as keyof typeof translations] || translations.en;
 
+  const { room, loading, error } = useGameRoom(roomId);
   const [results, setResults] = useState<PlayerResult[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -59,42 +63,55 @@ export default function ResultsPage() {
       return;
     }
     if (!roomId) {
-        router.push('/');
-        return;
+      router.push('/');
+      return;
     }
+  }, [isAuthenticated, roomId, router]);
 
-    setIsLoading(true);
-    const playersRaw = localStorage.getItem(`room-${roomId}-players`);
-    if (playersRaw) {
-      try {
-        const playersData: PlayerResult[] = JSON.parse(playersRaw);
-        // Sort by score to determine rank
-        const sortedPlayers = [...playersData].sort((a, b) => b.score - a.score);
-        const rankedPlayers = sortedPlayers.map((player, index) => ({
-          ...player,
-          rank: index + 1,
-        }));
-        setResults(rankedPlayers);
-      } catch (e) {
-        console.error("Error parsing player results:", e);
-        setResults([]);
-      }
-    } else {
-      setResults([]); // No data found
+  useEffect(() => {
+    if (!room || loading) return;
+
+    try {
+      // Sort players by score to determine rank
+      const sortedPlayers = [...room.players].sort((a: Player, b: Player) => b.score - a.score);
+      const rankedPlayers = sortedPlayers.map((player: Player, index: number) => ({
+        id: player.id,
+        name: player.name,
+        score: player.score,
+        rank: index + 1,
+      }));
+      setResults(rankedPlayers);
+    } catch (e) {
+      console.error("Error processing player results:", e);
+      setResults([]);
     }
-    setIsLoading(false);
-  }, [isAuthenticated, router, roomId, T]);
+  }, [room, loading]);
 
-
-  if (isLoading) {
-    return <PageWrapper><div className="flex justify-center items-center h-full pt-10">{T.loadingResults}</div></PageWrapper>;
+  if (loading) {
+    return (
+      <PageWrapper>
+        <div className="flex justify-center items-center h-full pt-10">{T.loading}</div>
+      </PageWrapper>
+    );
   }
 
-  if (results.length === 0 && !isLoading) {
-     return <PageWrapper><div className="flex justify-center items-center h-full pt-10">{T.errorLoadingResults}</div></PageWrapper>;
+  if (error || !room) {
+    return (
+      <PageWrapper>
+        <div className="flex justify-center items-center h-full pt-10">{T.roomNotFound}</div>
+      </PageWrapper>
+    );
   }
 
-  const winner = results.length > 0 && results[0].score > 0 ? results[0] : null; // Check if score > 0 for a winner
+  if (results.length === 0) {
+    return (
+      <PageWrapper>
+        <div className="flex justify-center items-center h-full pt-10">{T.errorLoadingResults}</div>
+      </PageWrapper>
+    );
+  }
+
+  const winner = results.length > 0 && results[0].score > 0 ? results[0] : null;
 
   return (
     <PageWrapper>
@@ -110,9 +127,9 @@ export default function ResultsPage() {
                 {T.congratulations(winner.name)}
               </CardDescription>
             ) : (
-                 <CardDescription className="text-xl mt-2">
-                    {T.noWinner}
-                 </CardDescription>
+              <CardDescription className="text-xl mt-2">
+                {T.noWinner}
+              </CardDescription>
             )}
           </CardHeader>
           <CardContent className="space-y-6">
@@ -145,10 +162,17 @@ export default function ResultsPage() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6">
-              <Button onClick={() => router.push(`/rooms/${roomId}/lobby`)} variant="outline" className="w-full sm:w-auto">
+              <Button 
+                onClick={() => router.push(`/rooms/${roomId}/lobby`)} 
+                variant="outline" 
+                className="w-full sm:w-auto"
+              >
                 <RotateCcw className="mr-2 h-5 w-5" /> {T.playAgainButton}
               </Button>
-              <Button onClick={() => router.push('/')} className="w-full sm:w-auto bg-primary hover:bg-primary/90">
+              <Button 
+                onClick={() => router.push('/')} 
+                className="w-full sm:w-auto bg-primary hover:bg-primary/90"
+              >
                 <Home className="mr-2 h-5 w-5" /> {T.backToHomeButton}
               </Button>
             </div>
@@ -158,4 +182,3 @@ export default function ResultsPage() {
     </PageWrapper>
   );
 }
-

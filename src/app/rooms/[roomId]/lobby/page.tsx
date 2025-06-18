@@ -2,21 +2,15 @@
 // src/app/rooms/[roomId]/lobby/page.tsx
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import PageWrapper from '@/components/layout/PageWrapper';
-import { useUser } from '@/contexts/UserContext';
-import { useRouter, useParams } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { ArrowRight, Info, Users, Settings, Play, UserCog, Zap } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import React from 'react';
+import { useParams } from 'next/navigation';
+import RealtimeLobby from './RealtimeLobby';
 
-interface Player {
-  id: string;
-  name: string;
-  score: number;
+export default function LobbyPage() {
+  const params = useParams();
+  const roomId = params.roomId as string;
+
+  return <RealtimeLobby roomId={roomId} />;
 }
 
 interface StoredRoomSettings {

@@ -12,6 +12,8 @@ import { AlertCircle, CheckCircle, HelpCircle, Send, Users, Sparkles } from 'luc
 import { validateWord, ValidateWordInput } from '@/ai/flows/validate-word';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { useGameRoom } from '@/hooks/useGameRoom';
+import { GameService, Player, Room, RoundData, PlayerSubmission } from '@/services/gameService';
 
 interface Player {
   id: string;

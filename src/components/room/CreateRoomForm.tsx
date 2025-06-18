@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { PlusCircle, Settings, Languages, Clock, ListOrdered, Loader2, Zap } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { GameService } from '@/services/gameService';
 
 interface RoomSettings {
   roomName: string;
@@ -140,8 +141,7 @@ export default function CreateRoomForm() {
     setSettings(prev => ({ ...prev, [name]: checked as any })); // Cast to any to satisfy type for boolean
   };
 
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username) {
       toast({
@@ -153,27 +153,49 @@ export default function CreateRoomForm() {
     }
     setIsCreating(true);
     const roomId = generateRoomId();
+    
     try {
-      // Simulate network delay for loader visibility
-      setTimeout(() => {
-        const roomSettingsToStore = { ...settings, admin: username, currentRound: 0 }; // currentRound 0 means not started
-        localStorage.setItem(`room-${roomId}-settings`, JSON.stringify(roomSettingsToStore));
-        localStorage.setItem(`room-${roomId}-players`, JSON.stringify([{id: username, name: username, score: 0}])); 
-        localStorage.removeItem(`room-${roomId}-used-letters`); // Clear used letters for a new room instance
-        toast({
-          title: T.toastRoomCreatedTitle,
-          description: T.toastRoomCreatedDescription(settings.roomName, roomId),
-        });
-        router.push(`/rooms/${roomId}/lobby`);
-        // No need to setIsCreating(false) here as component will unmount
-      }, 500); // Small delay to show loader
+      // Convertir settings a formato Firebase
+      const roomSettings = {
+        roomName: settings.roomName,
+        numberOfRounds: settings.numberOfRounds,
+        timePerRound: settings.timePerRound,
+        categories: settings.categories.split(',').map(c => c.trim()),
+        language: settings.language,
+        endRoundOnFirstSubmit: settings.endRoundOnFirstSubmit,
+        admin: username,
+        currentRound: 0,
+        gameStatus: 'waiting' as const,
+      };
+
+      const creator = {
+        id: username,
+        name: username,
+        score: 0,
+        joinedAt: new Date()
+      };
+
+      // Usar GameService para crear la sala en Firebase
+      await GameService.createRoom(roomId, roomSettings, creator);
+      
+      // Mantener localStorage como fallback para compatibilidad
+      localStorage.setItem(`room-${roomId}-settings`, JSON.stringify({ ...roomSettings, categories: settings.categories }));
+      localStorage.setItem(`room-${roomId}-players`, JSON.stringify([{id: username, name: username, score: 0}])); 
+      localStorage.removeItem(`room-${roomId}-used-letters`);
+      
+      toast({
+        title: T.toastRoomCreatedTitle,
+        description: T.toastRoomCreatedDescription(settings.roomName, roomId),
+      });
+      
+      router.push(`/rooms/${roomId}/lobby`);
     } catch (error) {
+      console.error("Error creating room:", error);
       toast({
         variant: "destructive",
         title: T.toastCreationFailedTitle,
         description: T.toastCreationFailedDescription,
       });
-      console.error("Error saving room settings to localStorage:", error);
       setIsCreating(false);
     }
   };
