@@ -6,6 +6,24 @@ La migración del juego Lexicon a un sistema multijugador en tiempo real ha sido
 
 ## 📁 Archivos Creados
 
+### Sistema de IDs Únicos:
+
+1. **Utilidades de Usuario**
+   ```
+   src/utils/userUtils.ts
+   ```
+   - Generación de IDs únicos para evitar conflictos por nombres duplicados
+   - Funciones para nombres de visualización sin conflictos
+   - Manejo automático de reconexiones
+
+2. **Documentación de Nombres Duplicados**
+   ```
+   MANEJO-NOMBRES-DUPLICADOS.md
+   ```
+   - Explicación completa del sistema de IDs únicos
+   - Ejemplos de uso y casos de prueba
+   - Guía para desarrolladores
+
 ### Componentes en Tiempo Real (Listos para Activación):
 
 1. **Página de Revisión**
@@ -84,6 +102,13 @@ chmod +x migrate-components.sh
 - **Notificaciones automáticas** entre jugadores
 - **Control granular de roles** (admin/jugador)
 - **Manejo de estados de juego** sincronizados
+
+### Sistema de IDs Únicos:
+- ✅ **Generación automática** de IDs únicos por usuario
+- ✅ **Manejo de nombres duplicados** sin conflictos de datos
+- ✅ **Reconexión automática** con la misma identidad
+- ✅ **Nombres de visualización** sin ambigüedades (Juan, Juan (2), Juan (3))
+- ✅ **Persistencia local** del ID por sala y usuario
 
 ### Componentes Migrados:
 - ✅ **Lobby** - Sincronización de jugadores

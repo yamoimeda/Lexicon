@@ -1,4 +1,3 @@
-
 // src/components/room/CreateRoomForm.tsx
 "use client";
 
@@ -14,6 +13,7 @@ import { PlusCircle, Settings, Languages, Clock, ListOrdered, Loader2, Zap } fro
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { GameService } from '@/services/gameService';
+import { generateUniqueUserId, generateDisplayName } from '@/utils/userUtils';
 
 interface RoomSettings {
   roomName: string;
@@ -150,11 +150,13 @@ export default function CreateRoomForm() {
         description: T.usernameNotAvailableError,
       });
       return;
-    }
-    setIsCreating(true);
+    }    setIsCreating(true);
     const roomId = generateRoomId();
     
     try {
+      // Generar ID único para el usuario creador
+      const creatorUserId = generateUniqueUserId(username);
+      
       // Convertir settings a formato Firebase
       const roomSettings = {
         roomName: settings.roomName,
@@ -163,14 +165,14 @@ export default function CreateRoomForm() {
         categories: settings.categories.split(',').map(c => c.trim()),
         language: settings.language,
         endRoundOnFirstSubmit: settings.endRoundOnFirstSubmit,
-        admin: username,
+        admin: creatorUserId, // Usar ID único como admin
         currentRound: 0,
         gameStatus: 'waiting' as const,
       };
 
       const creator = {
-        id: username,
-        name: username,
+        id: creatorUserId, // Usar ID único
+        name: username, // Mantener nombre para mostrar
         score: 0,
         joinedAt: new Date()
       };
@@ -178,9 +180,12 @@ export default function CreateRoomForm() {
       // Usar GameService para crear la sala en Firebase
       await GameService.createRoom(roomId, roomSettings, creator);
       
+      // Guardar ID único en localStorage para este usuario y sala
+      localStorage.setItem(`userId_${roomId}_${username}`, creatorUserId);
+      
       // Mantener localStorage como fallback para compatibilidad
       localStorage.setItem(`room-${roomId}-settings`, JSON.stringify({ ...roomSettings, categories: settings.categories }));
-      localStorage.setItem(`room-${roomId}-players`, JSON.stringify([{id: username, name: username, score: 0}])); 
+      localStorage.setItem(`room-${roomId}-players`, JSON.stringify([{id: creatorUserId, name: username, score: 0}])); 
       localStorage.removeItem(`room-${roomId}-used-letters`);
       
       toast({
