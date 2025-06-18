@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { PlusCircle, Settings, Languages, Clock, ListOrdered } from 'lucide-react';
+import { PlusCircle, Settings, Languages, Clock, ListOrdered, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface RoomSettings {
@@ -42,6 +42,7 @@ const translations = {
     french: "Français (French)",
     german: "Deutsch (German)",
     createRoomButton: "Create Room",
+    creatingRoomButton: "Creating Room...",
     toastRoomCreatedTitle: "Room Created!",
     toastRoomCreatedDescription: (roomName: string, roomId: string) => `Room ${roomName} (ID: ${roomId}) is ready.`,
     toastCreationFailedTitle: "Failed to create room",
@@ -64,6 +65,7 @@ const translations = {
     french: "Francés (French)",
     german: "Alemán (German)",
     createRoomButton: "Crear Sala",
+    creatingRoomButton: "Creando Sala...",
     toastRoomCreatedTitle: "¡Sala Creada!",
     toastRoomCreatedDescription: (roomName: string, roomId: string) => `La sala ${roomName} (ID: ${roomId}) está lista.`,
     toastCreationFailedTitle: "Error al crear la sala",
@@ -87,6 +89,7 @@ export default function CreateRoomForm() {
   const { username, language: uiLanguage } = useUser(); 
   const { toast } = useToast();
   const T = translations[uiLanguage as keyof typeof translations] || translations.en;
+  const [isCreating, setIsCreating] = useState(false);
   
   const getTranslatedDefaultCategories = useCallback((langKey: string): string => {
     const categories = defaultCategories[langKey as keyof typeof defaultCategories] || defaultCategories.en;
@@ -94,7 +97,6 @@ export default function CreateRoomForm() {
   }, []);
 
   const [settings, setSettings] = useState<RoomSettings>(() => {
-    // Initialize with potentially server-rendered (initial) values from useUser
     const initialGameLanguage = mapUiLangToGameLang(uiLanguage);
     const initialCategories = getTranslatedDefaultCategories(uiLanguage);
     const initialRoomName = `${username || 'Player'}'s Game`;
@@ -108,7 +110,6 @@ export default function CreateRoomForm() {
   });
 
   useEffect(() => {
-    // This effect runs on the client when uiLanguage or username might have updated from localStorage
     setSettings(prev => ({
       ...prev,
       language: mapUiLangToGameLang(uiLanguage),
@@ -137,17 +138,22 @@ export default function CreateRoomForm() {
       });
       return;
     }
+    setIsCreating(true);
     const roomId = generateRoomId();
     try {
-      const roomSettingsToStore = { ...settings, admin: username };
-      localStorage.setItem(`room-${roomId}-settings`, JSON.stringify(roomSettingsToStore));
-      // Ensure the creator is also added to the players list with a score of 0
-      localStorage.setItem(`room-${roomId}-players`, JSON.stringify([{id: username, name: username, score: 0}])); 
-      toast({
-        title: T.toastRoomCreatedTitle,
-        description: T.toastRoomCreatedDescription(settings.roomName, roomId),
-      });
-      router.push(`/rooms/${roomId}/lobby`);
+      // Simulate network delay for loader visibility
+      setTimeout(() => {
+        const roomSettingsToStore = { ...settings, admin: username, currentRound: 0 }; // currentRound 0 means not started
+        localStorage.setItem(`room-${roomId}-settings`, JSON.stringify(roomSettingsToStore));
+        localStorage.setItem(`room-${roomId}-players`, JSON.stringify([{id: username, name: username, score: 0}])); 
+        localStorage.removeItem(`room-${roomId}-used-letters`); // Clear used letters for a new room instance
+        toast({
+          title: T.toastRoomCreatedTitle,
+          description: T.toastRoomCreatedDescription(settings.roomName, roomId),
+        });
+        router.push(`/rooms/${roomId}/lobby`);
+        // No need to setIsCreating(false) here as component will unmount
+      }, 500); // Small delay to show loader
     } catch (error) {
       toast({
         variant: "destructive",
@@ -155,6 +161,7 @@ export default function CreateRoomForm() {
         description: T.toastCreationFailedDescription,
       });
       console.error("Error saving room settings to localStorage:", error);
+      setIsCreating(false);
     }
   };
 
@@ -168,17 +175,17 @@ export default function CreateRoomForm() {
         <CardContent className="space-y-6">
           <div>
             <Label htmlFor="roomName" className="font-semibold">{T.roomNameLabel}</Label>
-            <Input id="roomName" name="roomName" value={settings.roomName} onChange={handleChange} required className="mt-1"/>
+            <Input id="roomName" name="roomName" value={settings.roomName} onChange={handleChange} required className="mt-1" disabled={isCreating}/>
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <Label htmlFor="numberOfRounds" className="font-semibold flex items-center"><ListOrdered className="mr-2 h-4 w-4 text-muted-foreground"/>{T.roundsLabel}</Label>
-              <Input id="numberOfRounds" name="numberOfRounds" type="number" min="1" max="10" value={settings.numberOfRounds} onChange={handleChange} required className="mt-1"/>
+              <Input id="numberOfRounds" name="numberOfRounds" type="number" min="1" max="10" value={settings.numberOfRounds} onChange={handleChange} required className="mt-1" disabled={isCreating}/>
             </div>
             <div>
               <Label htmlFor="timePerRound" className="font-semibold flex items-center"><Clock className="mr-2 h-4 w-4 text-muted-foreground"/>{T.timePerRoundLabel}</Label>
-              <Input id="timePerRound" name="timePerRound" type="number" min="30" max="180" step="10" value={settings.timePerRound} onChange={handleChange} required className="mt-1"/>
+              <Input id="timePerRound" name="timePerRound" type="number" min="30" max="180" step="10" value={settings.timePerRound} onChange={handleChange} required className="mt-1" disabled={isCreating}/>
             </div>
           </div>
           
@@ -192,13 +199,14 @@ export default function CreateRoomForm() {
               placeholder={T.defaultCategoriesPlaceholder(uiLanguage)}
               required 
               className="mt-1"
+              disabled={isCreating}
             />
             <p className="text-xs text-muted-foreground mt-1">{T.categoriesDescription}</p>
           </div>
 
           <div>
             <Label htmlFor="language" className="font-semibold flex items-center"><Languages className="mr-2 h-4 w-4 text-muted-foreground"/>{T.languageLabel}</Label>
-            <Select name="language" value={settings.language} onValueChange={(value) => handleSelectChange('language', value)}>
+            <Select name="language" value={settings.language} onValueChange={(value) => handleSelectChange('language', value)} disabled={isCreating}>
               <SelectTrigger className="w-full mt-1">
                 <SelectValue placeholder={T.selectLanguagePlaceholder} />
               </SelectTrigger>
@@ -214,12 +222,20 @@ export default function CreateRoomForm() {
 
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-3">
-            <PlusCircle className="mr-2" /> {T.createRoomButton}
+          <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-3" disabled={isCreating}>
+            {isCreating ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                {T.creatingRoomButton}
+              </>
+            ) : (
+              <>
+                <PlusCircle className="mr-2" /> {T.createRoomButton}
+              </>
+            )}
           </Button>
         </CardFooter>
       </form>
     </Card>
   );
 }
-
