@@ -3,7 +3,6 @@
 
 import React, { useEffect } from 'react';
 import { useGameRoom } from '@/hooks/useGameRoom';
-import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/contexts/UserContext';
 
 interface RealtimeNotificationsProps {
@@ -12,7 +11,6 @@ interface RealtimeNotificationsProps {
 
 export default function RealtimeNotifications({ roomId }: RealtimeNotificationsProps) {
   const { room, currentRound } = useGameRoom(roomId);
-  const { toast } = useToast();
   const { username, language } = useUser();
 
   const translations = {
@@ -44,15 +42,12 @@ export default function RealtimeNotifications({ roomId }: RealtimeNotificationsP
   useEffect(() => {
     if (!room) return;
 
-    // Aquí podrías implementar lógica para detectar cuando los jugadores se unen/salen
-    // Por simplicidad, mostramos una notificación cuando detectamos cambios
-    
+    // Lógica para detectar cuando los jugadores se unen/salen
+    // Los toasts han sido eliminados para evitar bucles infinitos
     const playerCount = room.players.length;
+    console.log('👥 Player count changed:', playerCount);
     
-    // Esta lógica se podría mejorar comparando con el estado anterior
-    // para detectar exactamente qué jugador se unió o salió
-    
-  }, [room?.players, T]);
+  }, [room?.players]);
 
   // Monitorear cambios en el estado del juego
   useEffect(() => {
@@ -61,20 +56,14 @@ export default function RealtimeNotifications({ roomId }: RealtimeNotificationsP
     switch (room.settings.gameStatus) {
       case 'playing':
         if (room.settings.currentRound > 0) {
-          toast({
-            title: T.newRoundStarted(room.settings.currentRound),
-            description: `Letter: ${room.settings.currentLetter}`,
-          });
+          console.log('🎮 New round started:', room.settings.currentRound, 'Letter:', room.settings.currentLetter);
         }
         break;
       case 'finished':
-        toast({
-          title: T.gameFinished,
-          description: "Check the final results!",
-        });
+        console.log('🏁 Game finished!');
         break;
     }
-  }, [room?.settings.gameStatus, room?.settings.currentRound, T, toast]);
+  }, [room?.settings.gameStatus, room?.settings.currentRound]);
 
   // Monitorear cambios en las submissions de la ronda
   useEffect(() => {
@@ -86,12 +75,10 @@ export default function RealtimeNotifications({ roomId }: RealtimeNotificationsP
     );
 
     const uniquePlayers = new Set(otherPlayerSubmissions.map(s => s.playerId));
+    console.log('📝 Other players submissions:', uniquePlayers.size);
     
-    // Aquí podrías implementar lógica más sofisticada para mostrar
-    // notificaciones solo cuando hay nuevas submissions
-    
-  }, [currentRound?.submissions, username, T]);
+  }, [currentRound?.submissions, username]);
 
-  // Este componente no renderiza nada visible, solo maneja notificaciones
+  // Este componente no renderiza nada visible, solo maneja logging
   return null;
 }

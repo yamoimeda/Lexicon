@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Send, Clock, Users, Gamepad2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
-import { useToast } from '@/hooks/use-toast';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import RealtimeNotifications from '@/components/game/RealtimeNotifications';
 
@@ -155,12 +154,10 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
       setIsSubmitting(false);
     }
   }, [room, username, wordSubmissions, submitWords, isSubmitting]);
-
   // Handle time up submission
   const handleTimeUp = useCallback(() => {
-    toast({ title: T.timeUp });
     handleSubmitWords();
-  }, [toast, T.timeUp, handleSubmitWords]);
+  }, [handleSubmitWords]);
 
   // Timer countdown
   useEffect(() => {

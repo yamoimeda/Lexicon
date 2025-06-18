@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { AlertCircle, CheckCircle, HelpCircle, Send, Users, Sparkles } from 'lucide-react';
 import { validateWord, ValidateWordInput } from '@/ai/flows/validate-word';
-import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { GameService } from '@/services/gameService';
@@ -136,7 +135,6 @@ export default function RealtimeReviewPage() {
   const params = useParams();
   const roomId = params.roomId as string;
   const roundNumber = parseInt(params.roundNumber as string, 10);
-  const { toast } = useToast();
   const T = translations[uiLanguage as keyof typeof translations] || translations.en;
 
   const { room, loading, error } = useGameRoom(roomId);
@@ -167,10 +165,9 @@ export default function RealtimeReviewPage() {
     if (!room || loading) return;
 
     const loadRoundData = async () => {
-      try {
-        const round = await GameService.getRound(roomId, roundNumber);
+      try {        const round = await GameService.getRound(roomId, roundNumber);
         if (!round) {
-          toast({ variant: "destructive", title: T.roundNotFound });
+          console.error('Round not found');
           router.push(`/rooms/${roomId}/lobby`);
           return;
         }
@@ -188,15 +185,13 @@ export default function RealtimeReviewPage() {
           loadAdminData(room, submissions);
         } else {
           loadPlayerData(currentPlayerSubmissions);
-        }
-      } catch (error) {
+        }      } catch (error) {
         console.error('Error loading round data:', error);
-        toast({ variant: "destructive", title: T.errorLoadingSettings });
       }
     };
 
     loadRoundData();
-  }, [room, roomId, roundNumber, username, loading, toast, T, router]);
+  }, [room, roomId, roundNumber, username, loading, T, router]);
 
   const loadPlayerData = (submissions: PlayerSubmission[]) => {
     const reviewData: PlayerRoundReviewData[] = room?.settings.categories.map((category: string) => {
@@ -266,20 +261,14 @@ export default function RealtimeReviewPage() {
       setPlayerReviewData(prev => prev.map((s, i) =>
         i === index ? { 
           ...s, 
-          isValid: result.isValid, 
-          validationReason: result.reason, 
+          isValid: result.isValid,          validationReason: result.reason, 
           isLoading: false 
         } : s
       ));
 
-      toast({
-        title: result.isValid ? T.wordValidToastTitle(submission.word) : T.wordInvalidToastTitle(submission.word),
-        description: result.isValid ? undefined : result.reason,
-        variant: result.isValid ? "default" : "destructive"
-      });
+      console.log('Word validation result:', result.isValid ? 'Valid' : 'Invalid', submission.word, result.reason);
     } catch (error) {
       console.error("Player validation error:", error);
-      toast({ variant: "destructive", title: T.errorValidatingToast });
       setPlayerReviewData(prev => prev.map((s, i) => i === index ? { ...s, isLoading: false } : s));
     }
   };
@@ -307,20 +296,14 @@ export default function RealtimeReviewPage() {
       setAdminAggregatedData(prev => {
         const newData = [...prev];
         newData[categoryIndex].words[wordIndex].isValidByAdmin = result.isValid;
-        newData[categoryIndex].words[wordIndex].validationReasonByAdmin = result.reason;
-        newData[categoryIndex].words[wordIndex].isAiValidating = false;
+        newData[categoryIndex].words[wordIndex].validationReasonByAdmin = result.reason;        newData[categoryIndex].words[wordIndex].isAiValidating = false;
         newData[categoryIndex].words[wordIndex].aiValidated = true;
         return newData;
       });
 
-      toast({
-        title: result.isValid ? T.wordValidToastTitle(wordInfo.word) : T.wordInvalidToastTitle(wordInfo.word),
-        description: result.isValid ? T.aiChecked : `${T.aiChecked}: ${result.reason || ''}`,
-        variant: result.isValid ? "default" : "destructive"
-      });
+      console.log('AI validation result:', result.isValid ? 'Valid' : 'Invalid', wordInfo.word, result.reason);
     } catch (error) {
       console.error("Admin AI validation error:", error);
-      toast({ variant: "destructive", title: T.errorValidatingToast });
       setAdminAggregatedData(prev => {
         const newData = [...prev];
         newData[categoryIndex].words[wordIndex].isAiValidating = false;
@@ -398,10 +381,9 @@ export default function RealtimeReviewPage() {
         // Update round status to completed
         await GameService.updateRound(roomId, roundNumber, {
           status: 'completed',
-          completedAt: new Date()
-        });
+          completedAt: new Date()        });
 
-        toast({ title: T.adminScoresFinalizedToast });
+        console.log('Admin scores finalized');
 
       } else {
         // Player confirms their own validations
@@ -444,16 +426,13 @@ export default function RealtimeReviewPage() {
               validationReason: sub.validationReason
             });
           }
-        }
-
-        setPlayerReviewData(updatedSubmissions);
-        toast({ title: T.playerRoundScoreToast(playerScore) });
+        }        setPlayerReviewData(updatedSubmissions);
+        console.log('Player round score:', playerScore);
       }
 
       router.push(`/rooms/${roomId}/round/${roundNumber}/wait`);
     } catch (error) {
       console.error('Error confirming review:', error);
-      toast({ variant: "destructive", title: "Error confirming review" });
     } finally {
       setIsConfirming(false);
     }

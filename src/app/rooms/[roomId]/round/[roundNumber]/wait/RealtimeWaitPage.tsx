@@ -8,7 +8,6 @@ import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Users, Play, Trophy, ListChecks, ArrowLeftToLine } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { GameService, Player } from '@/services/gameService';
 
@@ -55,7 +54,6 @@ export default function RealtimeWaitPage() {
   const params = useParams();
   const roomId = params.roomId as string;
   const roundNumber = parseInt(params.roundNumber as string, 10);
-  const { toast } = useToast();
   const T = translations[uiLanguage as keyof typeof translations] || translations.en;
 
   const { room, currentRound, loading, error } = useGameRoom(roomId);
@@ -84,8 +82,7 @@ export default function RealtimeWaitPage() {
 
   const handleNextRound = async () => {
     if (!room) return;
-    
-    try {
+      try {
       const nextRoundNumber = room.settings.currentRound + 1;
       
       // Update room settings to next round
@@ -94,22 +91,20 @@ export default function RealtimeWaitPage() {
         'settings.gameStatus': 'playing'
       });
       
-      toast({ title: `Starting Round ${nextRoundNumber}` });
+      console.log(`Starting Round ${nextRoundNumber}`);
       router.push(`/rooms/${roomId}/play`);
     } catch (error) {
       console.error('Error starting next round:', error);
-      toast({ variant: "destructive", title: "Error starting next round" });
     }
   };
 
   const handleFinishGame = async () => {
     try {
       await GameService.finishGame(roomId);
-      toast({ title: "Game finished!" });
+      console.log('Game finished!');
       router.push(`/rooms/${roomId}/results`);
     } catch (error) {
       console.error('Error finishing game:', error);
-      toast({ variant: "destructive", title: "Error finishing game" });
     }
   };
 
