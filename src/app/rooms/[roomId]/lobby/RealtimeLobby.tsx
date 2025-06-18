@@ -87,12 +87,11 @@ export default function RealtimeLobby({ roomId }: RealtimeLobbyProps) {
   const hasRedirected = useRef(false);
 
   console.log('👤 RealtimeLobby - User context', { username, uiLanguage });
-
   const {
     room,
     loading,
     error,
-    isAdmin,
+    isAdmin: isAdminValue,
     joinRoom,
     startRound,
     leaveRoom
@@ -103,6 +102,7 @@ export default function RealtimeLobby({ roomId }: RealtimeLobbyProps) {
     loading, 
     error, 
     gameStatus: room?.settings?.gameStatus,
+    isAdmin: isAdminValue,
     hasJoined: hasJoined.current,
     hasRedirected: hasRedirected.current
   });
@@ -136,9 +136,8 @@ export default function RealtimeLobby({ roomId }: RealtimeLobbyProps) {
       router.push(`/rooms/${roomId}/play`);
     }
   }, [room?.settings.gameStatus, roomId, router]);
-
   const handleStartGame = async () => {
-    if (!isAdmin || !room) return;
+    if (!isAdminValue || !room) return;
     
     try {
       // Generar letra aleatoria para la primera ronda
@@ -254,10 +253,8 @@ export default function RealtimeLobby({ roomId }: RealtimeLobbyProps) {
                   </ul>
                 </CardContent>
               </Card>
-            </div>
-
-            {/* Controles de juego */}
-            {isAdmin && room.settings.gameStatus === 'waiting' && (
+            </div>            {/* Controles de juego */}
+            {isAdminValue && room.settings.gameStatus === 'waiting' && (
               <Card className="border-primary border-2">
                 <CardHeader>
                   <CardTitle className="text-xl flex items-center">
@@ -276,10 +273,8 @@ export default function RealtimeLobby({ roomId }: RealtimeLobbyProps) {
                   </Button>
                 </CardContent>
               </Card>
-            )}
-
-            {/* Mensaje para jugadores no-admin */}
-            {!isAdmin && room.settings.gameStatus === 'waiting' && (
+            )}            {/* Mensaje para jugadores no-admin */}
+            {!isAdminValue && room.settings.gameStatus === 'waiting' && (
               <div className="text-center text-muted-foreground p-4 bg-muted rounded-md">
                 {T.waitingForAdmin(room.settings.admin)}
               </div>

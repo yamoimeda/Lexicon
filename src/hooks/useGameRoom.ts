@@ -1,5 +1,5 @@
 // src/hooks/useGameRoom.ts
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { GameService, Room, RoundData, Player } from '@/services/gameService';
@@ -13,6 +13,7 @@ export const useGameRoom = (roomId: string) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [adminUserId, setAdminUserId] = useState<string | null>(null);
   // Generar o recuperar ID único para el usuario
   useEffect(() => {
     console.log('🔍 useGameRoom - Effect 1: Generating userId', { username, roomId });
@@ -64,20 +65,30 @@ export const useGameRoom = (roomId: string) => {
         console.log('📊 useGameRoom - Round data received:', roundData ? 'Round exists' : 'Round not found');
         setCurrentRound(roundData);
       }
-    );
+    );    return unsubscribe;
+  }, [roomId, room?.settings.currentRound]);
 
-    return unsubscribe;
-  }, [roomId, room?.settings.currentRound]);  // Verificar si el usuario actual es admin
-  const isAdmin = useCallback(() => {
-    console.log('👑 useGameRoom - isAdmin called', { 
-      hasRoom: !!room, 
-      currentUserId, 
-      roomAdmin: room?.settings.admin,
+  // Extraer solo el admin ID para evitar recalcular isAdmin constantemente
+  useEffect(() => {
+    console.log('🔑 useGameRoom - Effect 4: Extract admin ID', { 
+      hasRoom: !!room,
+      newAdminId: room?.settings.admin 
+    });
+    if (room?.settings.admin) {
+      setAdminUserId(room.settings.admin);
+    } else {
+      setAdminUserId(null);
+    }
+  }, [room?.settings.admin]);  // Verificar si el usuario actual es admin (usando valores estables)
+  const isAdmin = useMemo(() => {
+    console.log('👑 useGameRoom - isAdmin computed', { 
+      currentUserId,
+      adminUserId,
       username 
     });
-    if (!room || !currentUserId) return false;
-    return room.settings.admin === currentUserId || extractUsernameFromId(room.settings.admin) === username;
-  }, [room, currentUserId, username]);  // Unirse a la sala
+    if (!adminUserId || !currentUserId) return false;
+    return adminUserId === currentUserId || extractUsernameFromId(adminUserId) === username;
+  }, [adminUserId, currentUserId, username]);// Unirse a la sala
   const joinRoom = useCallback(async () => {
     console.log('🚪 useGameRoom - joinRoom called', { username, roomId, currentUserId });
     if (!username || !roomId || !currentUserId) return;
