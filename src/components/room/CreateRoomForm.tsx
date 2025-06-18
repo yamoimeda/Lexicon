@@ -25,8 +25,8 @@ interface RoomSettings {
 }
 
 const defaultCategories = {
-  en: ["Animals", "Countries", "Fruits", "Colors", "Sports"],
-  es: ["Animales", "Países", "Frutas", "Colores", "Deportes"],
+  en: ["Nombre", "Apellido", "Fruit", "Color", "Cosa"],
+  es: ["Name", "Surname", "Fruta", "Color", "Cosa"],
 };
 
 const translations = {

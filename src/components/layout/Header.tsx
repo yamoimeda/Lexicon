@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const translations = {
   en: {
-    title: "WordDuel",
+    title: "Lexicon",
     logout: "Logout",
     login: "Login",
     language: "Language",
@@ -18,7 +18,7 @@ const translations = {
     spanish: "Español",
   },
   es: {
-    title: "WordDuel",
+    title: "Lexicon",
     logout: "Salir",
     login: "Ingresar",
     language: "Idioma",
