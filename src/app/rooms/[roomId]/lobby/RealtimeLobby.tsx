@@ -1,7 +1,7 @@
 // src/app/rooms/[roomId]/lobby/RealtimeLobby.tsx
 "use client";
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import PageWrapper from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/button';
@@ -82,6 +82,7 @@ export default function RealtimeLobby({ roomId }: RealtimeLobbyProps) {
   const router = useRouter();
   const T = translations[uiLanguage as keyof typeof translations] || translations.en;
   const hasJoined = useRef(false);
+  const hasRedirected = useRef(false);
 
   const {
     room,
@@ -91,17 +92,20 @@ export default function RealtimeLobby({ roomId }: RealtimeLobbyProps) {
     joinRoom,
     startRound,
     leaveRoom
-  } = useGameRoom(roomId);  // Auto-join cuando se monta el componente (solo una vez)
+  } = useGameRoom(roomId);
+
+  // Auto-join cuando se monta el componente (solo una vez)
   useEffect(() => {
     if (roomId && username && !hasJoined.current && !loading) {
       hasJoined.current = true;
-      joinRoom(); // Llamar la función aquí
+      joinRoom();
     }
-  }, [roomId, username, loading]); // Removido joinRoom de dependencias
+  }, [roomId, username, loading]); // Sin joinRoom en dependencias
 
-  // Redirigir cuando el juego comience
+  // Redirigir cuando el juego comience (solo una vez)
   useEffect(() => {
-    if (room?.settings.gameStatus === 'playing') {
+    if (room?.settings.gameStatus === 'playing' && !hasRedirected.current) {
+      hasRedirected.current = true;
       router.push(`/rooms/${roomId}/play`);
     }
   }, [room?.settings.gameStatus, roomId, router]);

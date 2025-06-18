@@ -1,5 +1,7 @@
 // src/hooks/useGameRoom.ts
 import { useState, useEffect, useCallback } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { GameService, Room, RoundData, Player } from '@/services/gameService';
 import { useUser } from '@/contexts/UserContext';
 import { generateUniqueUserId, generateDisplayName, extractUsernameFromId } from '@/utils/userUtils';
@@ -67,13 +69,23 @@ export const useGameRoom = (roomId: string) => {
   const joinRoom = useCallback(async () => {
     if (!username || !roomId || !currentUserId) return;
 
-    try {      // Verificar si el usuario ya está en la sala
-      if (room && room.players.find((p: Player) => p.id === currentUserId)) {
+    try {
+      const roomRef = doc(db, 'rooms', roomId);
+      const roomSnap = await getDoc(roomRef);
+      
+      if (!roomSnap.exists()) {
+        throw new Error('Room not found');
+      }
+
+      const currentRoom = roomSnap.data() as Room;
+      
+      // Verificar si el usuario ya está en la sala
+      if (currentRoom.players.find((p: Player) => p.id === currentUserId)) {
         return; // Ya está en la sala
       }
 
       // Generar nombre para mostrar que evite conflictos
-      const displayName = room ? generateDisplayName(username, room.players) : username;
+      const displayName = generateDisplayName(username, currentRoom.players);
 
       const player: Player = {
         id: currentUserId,
@@ -81,11 +93,12 @@ export const useGameRoom = (roomId: string) => {
         score: 0,
         joinedAt: new Date()
       };
+      
       await GameService.joinRoom(roomId, player);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join room');
     }
-  }, [roomId, username, currentUserId]); // Removido 'room' de las dependencias
+  }, [roomId, username, currentUserId]);
   // Salir de la sala
   const leaveRoom = useCallback(async () => {
     if (!currentUserId || !roomId) return;
