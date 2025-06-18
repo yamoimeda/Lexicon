@@ -1,4 +1,3 @@
-
 // src/app/rooms/[roomId]/lobby/page.tsx
 "use client";
 
