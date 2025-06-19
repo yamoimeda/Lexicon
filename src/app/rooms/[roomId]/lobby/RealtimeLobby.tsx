@@ -159,13 +159,13 @@ export default function RealtimeLobby({ roomId }: RealtimeLobbyProps) {
       const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
       const randomLetter = letters[Math.floor(Math.random() * letters.length)];
       const durationSeconds = room.settings.timePerRound || 60;
-      // 1. Establecer timerEndAt en Firestore
-      await GameService.startRoundWithTimer(roomId, 1, durationSeconds);
-      // 2. Cambiar estado de la sala a playing y setear letra
+      // 1. Crear la ronda y actualizar estado de la sala
       await startRound(1, randomLetter);
+      // 2. Ahora sí, actualizar el timer en el documento de la ronda
+      await GameService.startRoundWithTimer(roomId, 1, durationSeconds);
       toast({ variant: 'success', title: T.gameStarted });
-    } catch (error) {
-      toast({ variant: 'destructive', title: T.errorUpdatingAdmin });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: T.errorUpdatingAdmin, description: error?.message || String(error) });
     }
     setIsStarting(false);
   };
