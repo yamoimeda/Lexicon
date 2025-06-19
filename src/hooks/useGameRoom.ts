@@ -69,8 +69,8 @@ export const useGameRoom = (roomId: string) => {
   }, [room?.settings.admin]);  // Verificar si el usuario actual es admin (usando valores estables)
   const isAdmin = useMemo(() => {
     if (!adminUserId || !currentUserId) return false;
-    return adminUserId === currentUserId || extractUsernameFromId(adminUserId) === username;
-  }, [adminUserId, currentUserId, username]);// Unirse a la sala
+    return adminUserId === currentUserId;
+  }, [adminUserId, currentUserId]);// Unirse a la sala
   const joinRoom = useCallback(async () => {
     if (!username || !roomId || !currentUserId) return;
 

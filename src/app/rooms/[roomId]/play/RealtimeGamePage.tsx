@@ -82,7 +82,9 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
     currentRound,
     loading,
     error,
-    submitWords
+    submitWords,
+    isAdmin,
+    currentUserId
   } = useGameRoom(roomId);
 
   const [wordSubmissions, setWordSubmissions] = useState<CategoryWordSubmission[]>([]);
@@ -145,13 +147,13 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
         break;
     }  }, [room?.settings.gameStatus, room?.settings.currentRound, roomId, router]);
 
-  // Redirigir si el usuario ya no está en la lista de jugadores
+  // Redirigir si el usuario ya no está en la lista de jugadores (por ID, no por nombre)
   useEffect(() => {
-    if (room && username && !room.players.some((p: any) => p.name === username)) {
+    if (room && currentUserId && !room.players.some((p: any) => p.id === currentUserId)) {
       toast({ variant: 'destructive', title: T.errorLoadingRoomSettings });
       router.push('/');
     }
-  }, [room, username, router, toast]);
+  }, [room, currentUserId, router, toast]);
 
   const handleWordChange = useCallback((category: string, newWord: string) => {
     setWordSubmissions((prevWords: CategoryWordSubmission[]) =>
@@ -289,6 +291,21 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
                     {T.autoSubmitMode}
                   </div>
                 )}
+                {/* Botón solo para el admin, debajo de autoSubmitMode */}
+                {!room.settings.endRoundOnFirstSubmit && isAdmin && room?.settings.gameStatus === 'playing' && (
+                  <Button 
+                    onClick={async () => {
+                      try {
+                        await GameService.finalizeRound(roomId, room.settings.currentRound, {});
+                        toast({ variant: 'success', title: 'Ronda finalizada, pasando a revisión.' });
+                      } catch (e) {
+                        toast({ variant: 'destructive', title: 'Error al finalizar la ronda.' });
+                      }
+                    }} 
+                    className="w-full bg-orange-600 hover:bg-orange-700 text-white text-lg py-3 mt-2">
+                    Forzar paso a revisión
+                  </Button>
+                )}
               </form>
             </CardContent>
           </Card>
@@ -343,20 +360,6 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
       <div className="my-4 p-2 bg-gray-100 text-xs rounded text-gray-700">
         <strong>DEBUG:</strong> isCurrentUserAdmin: {String(isCurrentUserAdmin)} | gameStatus: {room?.settings.gameStatus} | admin: {room?.settings.admin} | username: {username}
       </div>
-
-      {/* Botón para forzar paso a revisión (ahora visible para cualquier usuario si está en playing, para pruebas) */}
-      {room?.settings.gameStatus === 'playing' && (
-        <Button onClick={async () => {
-          try {
-            await GameService.finalizeRound(roomId, room.settings.currentRound, {});
-            toast({ variant: 'success', title: 'Ronda finalizada, pasando a revisión.' });
-          } catch (e) {
-            toast({ variant: 'destructive', title: 'Error al finalizar la ronda.' });
-          }
-        }} className="w-full bg-orange-600 hover:bg-orange-700 text-white text-lg py-3">
-          Forzar paso a revisión (QA)
-        </Button>
-      )}
     </PageWrapper>
   );
 }
