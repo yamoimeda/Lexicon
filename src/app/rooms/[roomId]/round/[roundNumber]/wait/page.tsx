@@ -1,4 +1,3 @@
-
 // src/app/rooms/[roomId]/round/[roundNumber]/wait/page.tsx
 "use client";
 
@@ -12,6 +11,12 @@ import { Users, Play, Trophy, ListChecks, ArrowLeftToLine } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { GameService } from '@/services/gameService';
+import { onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { Loader2 } from 'lucide-react';
+import { useWaitRoundSync } from '@/hooks/useWaitRoundSync';
+import { useSynchronizedTimer } from '@/hooks/useSynchronizedTimer';
 
 interface Player {
   id: string;
@@ -70,10 +75,18 @@ export default function WaitRoundPage() {
   const { toast } = useToast();
   const T = translations[uiLanguage as keyof typeof translations] || translations.en;
 
-  const [roomSettings, setRoomSettings] = useState<StoredRoomSettings | null>(null);
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [currentPlayerRoundScore, setCurrentPlayerRoundScore] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isAdvancing, setIsAdvancing] = useState(false);
+
+  // Sustituir los estados y useEffect por el hook personalizado
+  const {
+    firestoreRoomSettings,
+    firestorePlayers,
+    currentPlayerRoundScore,
+    isLoading,
+    error
+  } = useWaitRoundSync(roomId, roundNumber, username);
+
+  const timeLeft = useSynchronizedTimer(roomId, roundNumber);
 
   useEffect(() => {
     if (!isAuthenticated || !username) {
@@ -84,62 +97,73 @@ export default function WaitRoundPage() {
       router.replace('/');
       return;
     }
+  }, [roomId, roundNumber, username, isAuthenticated, router]);
 
-    setIsLoading(true);
-    const settingsRaw = localStorage.getItem(`room-${roomId}-settings`);
-    if (settingsRaw) {
-      const parsedSettings: StoredRoomSettings = JSON.parse(settingsRaw);
-      setRoomSettings(parsedSettings);
-      
-      // Ensure currentRound in settings matches the page's roundNumber
-      // This is important if admin advances round, others refresh this page.
-      // For now, we assume navigation is correct.
-       if(parsedSettings.currentRound !== roundNumber && username === parsedSettings.admin){
-        // If admin is on a wait page for a previous round but settings show a newer round,
-        // perhaps auto-navigate them to the play page of the current round in settings.
-        // For now, this just indicates a potential sync issue if manual refresh happens.
-       }
-    } else {
-      toast({ variant: "destructive", title: T.errorLoadingData });
-      router.push(`/rooms/${roomId}/lobby`);
-      return;
+  const handleNextRound = async () => {
+    if (!firestoreRoomSettings || isAdvancing) return;
+    setIsAdvancing(true);
+    const nextRoundNumber = firestoreRoomSettings.currentRound + 1;
+    const durationSeconds = firestoreRoomSettings.timePerRound || 60;
+    try {
+      // Validar estado actual en Firestore
+      const roomSnap = await getDoc(doc(db, 'rooms', roomId));
+      const data = roomSnap.data();
+      if (data.settings.currentRound !== firestoreRoomSettings.currentRound) {
+        toast({ variant: "destructive", title: "La ronda ya fue avanzada por otro admin." });
+        setIsAdvancing(false);
+        return;
+      }
+      await GameService.startRoundWithTimer(roomId, nextRoundNumber, durationSeconds);
+      toast({ variant: "success", title: "Ronda iniciada" });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error al avanzar de ronda." });
     }
-
-    const playersRaw = localStorage.getItem(`room-${roomId}-players`);
-    if (playersRaw) {
-      setPlayers(JSON.parse(playersRaw).sort((a: Player, b: Player) => b.score - a.score));
-    }
-
-    // This will now reflect the score finalized by admin (or player's preliminary if admin hasn't finalized yet)
-    const roundScoreRaw = localStorage.getItem(`room-${roomId}-round-${roundNumber}-player-${username}-roundScore`);
-    if (roundScoreRaw) {
-      setCurrentPlayerRoundScore(JSON.parse(roundScoreRaw));
-    }
-    setIsLoading(false);
-  }, [roomId, roundNumber, username, isAuthenticated, router, toast, T]);
-
-  const handleNextRound = () => {
-    if (!roomSettings) return;
-    const nextRoundNumber = roomSettings.currentRound + 1; // currentRound is the one just finished
-    const updatedSettings = { ...roomSettings, currentRound: nextRoundNumber };
-    localStorage.setItem(`room-${roomId}-settings`, JSON.stringify(updatedSettings));
-    router.push(`/rooms/${roomId}/play`);
+    setIsAdvancing(false);
   };
 
-  const handleFinishGame = () => {
-    router.push(`/rooms/${roomId}/results`);
+  // Efecto: Si el tiempo llega a 0 y el usuario es admin y la sala sigue en playing, pasar a revisión automáticamente
+  useEffect(() => {
+    if (
+      isCurrentUserAdmin &&
+      timeLeft === 0 &&
+      firestoreRoomSettings?.gameStatus === 'playing'
+    ) {
+      // Lógica para finalizar ronda y pasar a revisión
+      const finalize = async () => {
+        try {
+          // Aquí deberías calcular los puntajes reales, por ahora solo cambia el estado
+          await GameService.finalizeRound(roomId, roundNumber, {});
+          toast({ variant: 'success', title: 'Ronda finalizada, pasando a revisión.' });
+        } catch (e) {
+          toast({ variant: 'destructive', title: 'Error al finalizar la ronda.' });
+        }
+      };
+      finalize();
+    }
+  }, [isCurrentUserAdmin, timeLeft, firestoreRoomSettings?.gameStatus, roomId, roundNumber, toast]);
+
+  // Botón para forzar paso a revisión si el admin lo desea
+  const handleForceFinalize = async () => {
+    try {
+      await GameService.finalizeRound(roomId, roundNumber, {});
+      toast({ variant: 'success', title: 'Ronda finalizada, pasando a revisión.' });
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Error al finalizar la ronda.' });
+    }
   };
 
-  if (isLoading || !roomSettings) {
+  if (isLoading) {
+    return <PageWrapper><div className="text-center pt-10"><Loader2 className="animate-spin inline-block mr-2" />{T.loadingData}</div></PageWrapper>;
+  }
+  if (error) {
+    return <PageWrapper><div className="text-center pt-10 text-red-500">{T.errorLoadingData}</div></PageWrapper>;
+  }
+  if (!firestoreRoomSettings) {
     return <PageWrapper><div className="text-center pt-10">{T.loadingData}</div></PageWrapper>;
   }
 
-  const isCurrentUserAdmin = username === roomSettings.admin;
-  // currentRound in settings should be the round that just finished or is about to start.
-  // If currentRound from settings is GREATER than roundNumber from URL, it means admin already moved to next.
-  // For simplicity, isLastRound check uses roundNumber from URL (which should be the completed round).
-  const isLastRound = roundNumber >= roomSettings.numberOfRounds;
-
+  const isCurrentUserAdmin = username === firestoreRoomSettings.admin;
+  const isLastRound = roundNumber >= firestoreRoomSettings.numberOfRounds;
 
   return (
     <PageWrapper>
@@ -162,7 +186,7 @@ export default function WaitRoundPage() {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2">
-                  {players.map((player, idx) => (
+                  {firestorePlayers.map((player: Player, idx: number) => (
                     <li key={player.id} className={`flex justify-between items-center p-2 rounded-md ${player.name === username ? 'bg-accent/20' : ''}`}>
                       <span className="font-semibold">{idx + 1}. {player.name}</span>
                       <span className="text-md font-bold text-primary">{player.score} {T.pointsSuffix}</span>
@@ -179,19 +203,25 @@ export default function WaitRoundPage() {
                 </CardHeader>
                 <CardContent className="flex flex-col space-y-3">
                   {!isLastRound ? (
-                    <Button onClick={handleNextRound} className="w-full bg-primary hover:bg-primary/90 text-lg py-3">
-                      <Play className="mr-2 h-5 w-5"/>{T.nextRoundButton} (Round {roundNumber + 1})
+                    <Button onClick={handleNextRound} className="w-full bg-primary hover:bg-primary/90 text-lg py-3" disabled={isAdvancing}>
+                      {isAdvancing ? <Loader2 className="animate-spin mr-2 h-5 w-5"/> : <Play className="mr-2 h-5 w-5"/>}
+                      {T.nextRoundButton} (Round {roundNumber + 1})
                     </Button>
                   ) : (
                     <Button onClick={handleFinishGame} className="w-full bg-green-600 hover:bg-green-700 text-white text-lg py-3">
                       <Trophy className="mr-2 h-5 w-5"/>{T.finishGameButton}
                     </Button>
                   )}
+                  {isCurrentUserAdmin && timeLeft === 0 && firestoreRoomSettings?.gameStatus === 'playing' && (
+                    <Button onClick={handleForceFinalize} className="w-full bg-orange-600 hover:bg-orange-700 text-white text-lg py-3">
+                      Forzar paso a revisión
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ) : (
               <p className="text-center text-muted-foreground p-4 bg-muted rounded-md">
-                {T.waitingForAdmin(roomSettings.admin)}
+                {T.waitingForAdmin(firestoreRoomSettings.admin)}
               </p>
             )}
              <Button variant="outline" onClick={() => router.push(`/rooms/${roomId}/lobby`)} className="w-full">

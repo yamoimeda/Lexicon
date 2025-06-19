@@ -6,6 +6,7 @@ import { GameService, Room, RoundData, Player } from '@/services/gameService';
 import { useUser } from '@/contexts/UserContext';
 import { generateUniqueUserId, generateDisplayName, extractUsernameFromId } from '@/utils/userUtils';
 
+// Eliminar logs de debug en producción y tipar callbacks
 export const useGameRoom = (roomId: string) => {
   const { username } = useUser();
   const [room, setRoom] = useState<Room | null>(null);
@@ -16,31 +17,25 @@ export const useGameRoom = (roomId: string) => {
   const [adminUserId, setAdminUserId] = useState<string | null>(null);
   // Generar o recuperar ID único para el usuario
   useEffect(() => {
-    console.log('🔍 useGameRoom - Effect 1: Generating userId', { username, roomId });
     if (!username) return;
-    
     // Intentar recuperar ID almacenado localmente para este usuario y sala
     const storedUserId = localStorage.getItem(`userId_${roomId}_${username}`);
     
     if (storedUserId) {
-      console.log('✅ useGameRoom - Using stored userId:', storedUserId);
       setCurrentUserId(storedUserId);
     } else {
       // Generar nuevo ID único
       const newUserId = generateUniqueUserId(username);
-      console.log('🆕 useGameRoom - Generated new userId:', newUserId);
       localStorage.setItem(`userId_${roomId}_${username}`, newUserId);
       setCurrentUserId(newUserId);
     }
   }, [username, roomId]);
   // Suscribirse a cambios en la sala
   useEffect(() => {
-    console.log('🏠 useGameRoom - Effect 2: Room subscription', { roomId });
     if (!roomId) return;
 
     setLoading(true);
-    const unsubscribe = GameService.subscribeToRoom(roomId, (roomData) => {
-      console.log('📡 useGameRoom - Room data received:', roomData ? 'Room exists' : 'Room not found');
+    const unsubscribe = GameService.subscribeToRoom(roomId, (roomData: Room | null) => {
       setRoom(roomData);
       setLoading(false);
       if (!roomData) {
@@ -52,28 +47,20 @@ export const useGameRoom = (roomId: string) => {
   }, [roomId]);
   // Suscribirse a cambios en la ronda actual
   useEffect(() => {
-    console.log('🎯 useGameRoom - Effect 3: Round subscription', { 
-      hasRoom: !!room, 
-      currentRound: room?.settings.currentRound 
-    });
     if (!room || !room.settings.currentRound) return;
 
     const unsubscribe = GameService.subscribeToRound(
       roomId, 
       room.settings.currentRound, 
-      (roundData) => {
-        console.log('📊 useGameRoom - Round data received:', roundData ? 'Round exists' : 'Round not found');
+      (roundData: RoundData | null) => {
         setCurrentRound(roundData);
       }
-    );    return unsubscribe;
+    );
+    return unsubscribe;
   }, [roomId, room?.settings.currentRound]);
 
   // Extraer solo el admin ID para evitar recalcular isAdmin constantemente
   useEffect(() => {
-    console.log('🔑 useGameRoom - Effect 4: Extract admin ID', { 
-      hasRoom: !!room,
-      newAdminId: room?.settings.admin 
-    });
     if (room?.settings.admin) {
       setAdminUserId(room.settings.admin);
     } else {
@@ -81,17 +68,10 @@ export const useGameRoom = (roomId: string) => {
     }
   }, [room?.settings.admin]);  // Verificar si el usuario actual es admin (usando valores estables)
   const isAdmin = useMemo(() => {
-    console.log('👑 useGameRoom - isAdmin computed', { 
-      currentUserId,
-      adminUserId,
-      username,
-      result: adminUserId === currentUserId || (adminUserId && extractUsernameFromId(adminUserId) === username)
-    });
     if (!adminUserId || !currentUserId) return false;
     return adminUserId === currentUserId || extractUsernameFromId(adminUserId) === username;
   }, [adminUserId, currentUserId, username]);// Unirse a la sala
   const joinRoom = useCallback(async () => {
-    console.log('🚪 useGameRoom - joinRoom called', { username, roomId, currentUserId });
     if (!username || !roomId || !currentUserId) return;
 
     try {
@@ -99,7 +79,6 @@ export const useGameRoom = (roomId: string) => {
       const roomSnap = await getDoc(roomRef);
       
       if (!roomSnap.exists()) {
-        console.log('❌ useGameRoom - Room not found');
         throw new Error('Room not found');
       }
 
@@ -107,13 +86,11 @@ export const useGameRoom = (roomId: string) => {
       
       // Verificar si el usuario ya está en la sala
       if (currentRoom.players.find((p: Player) => p.id === currentUserId)) {
-        console.log('✅ useGameRoom - User already in room');
         return; // Ya está en la sala
       }
 
       // Generar nombre para mostrar que evite conflictos
       const displayName = generateDisplayName(username, currentRoom.players);
-      console.log('🏷️ useGameRoom - Generated display name:', displayName);
 
       const player: Player = {
         id: currentUserId,
@@ -122,11 +99,8 @@ export const useGameRoom = (roomId: string) => {
         joinedAt: new Date()
       };
       
-      console.log('🎮 useGameRoom - Joining room with player:', player);
       await GameService.joinRoom(roomId, player);
-      console.log('✅ useGameRoom - Successfully joined room');
     } catch (err) {
-      console.error('❌ useGameRoom - Error joining room:', err);
       setError(err instanceof Error ? err.message : 'Failed to join room');
     }
   }, [roomId, username, currentUserId]);
@@ -190,7 +164,18 @@ export const useGameRoom = (roomId: string) => {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to finish game');
     }
-  }, [roomId, isAdmin]);  return {
+  }, [roomId, isAdmin]);  // Documentación de retornos
+  /**
+   * Retorna:
+   * - room: Estado reactivo de la sala
+   * - currentRound: Estado reactivo de la ronda
+   * - loading: booleano de carga
+   * - error: string de error
+   * - currentUserId: ID único del usuario
+   * - isAdmin: booleano si el usuario es admin
+   * - joinRoom, leaveRoom, startRound, submitWords, finalizeRound, finishGame: acciones principales
+   */
+  return {
     room,
     currentRound,
     loading,

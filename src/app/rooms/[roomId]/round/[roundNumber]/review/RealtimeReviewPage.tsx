@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { GameService } from '@/services/gameService';
 import { Player, Room, RoundData, PlayerSubmission } from '@/services/gameService';
+import { useToast } from '@/hooks/use-toast';
 
 interface PlayerRoundReviewData {
   category: string;
@@ -148,6 +149,7 @@ export default function RealtimeReviewPage() {
   const [adminAggregatedData, setAdminAggregatedData] = useState<AggregatedCategoryView[]>([]);
 
   const [isConfirming, setIsConfirming] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!isAuthenticated || !username) {
@@ -327,9 +329,8 @@ export default function RealtimeReviewPage() {
   };
 
   const handleConfirm = async () => {
-    if (!room || !username || !currentRound) return;
+    if (!room || !username || !currentRound || isConfirming) return;
     setIsConfirming(true);
-
     try {
       if (room.adminId === username) {
         // Admin finalizes scores for everyone
@@ -430,9 +431,10 @@ export default function RealtimeReviewPage() {
         console.log('Player round score:', playerScore);
       }
 
+      toast({ variant: 'success', title: isCurrentUserAdmin ? T.adminScoresFinalizedToast : T.playerRoundScoreToast(0) });
       router.push(`/rooms/${roomId}/round/${roundNumber}/wait`);
     } catch (error) {
-      console.error('Error confirming review:', error);
+      toast({ variant: 'destructive', title: T.errorLoadingSubmissions });
     } finally {
       setIsConfirming(false);
     }
@@ -445,6 +447,17 @@ export default function RealtimeReviewPage() {
   if (error || !room) {
     return <PageWrapper><div className="text-center pt-10">{T.roomNotFound}</div></PageWrapper>;
   }
+
+  // Redirigir si el usuario ya no está en la lista de jugadores
+  useEffect(() => {
+    if (room && username && !room.players.some((p: any) => p.name === username)) {
+      toast({ variant: 'destructive', title: T.roomNotFound });
+      router.push('/');
+    }
+  }, [room, username, router, toast]);
+
+  // Advertencia si hay nombres duplicados
+  const duplicateNames = room?.players?.map((p: any) => p.name).filter((name: string, idx: number, arr: string[]) => arr.indexOf(name) !== idx && arr.lastIndexOf(name) === idx) || [];
 
   const isCurrentUserAdmin = room.adminId === username;
 
@@ -587,7 +600,7 @@ export default function RealtimeReviewPage() {
               className="w-full text-lg py-3 bg-primary hover:bg-primary/90"
               disabled={isConfirming || (playerReviewData.length === 0 && !isCurrentUserAdmin) || (adminAggregatedData.length === 0 && isCurrentUserAdmin)}
             >
-              <Send className="mr-2 h-5 w-5"/>
+              {isConfirming ? <span className="animate-spin mr-2 h-5 w-5 border-b-2 border-white rounded-full inline-block"/> : <Send className="mr-2 h-5 w-5"/>}
               {isConfirming ? 
                 (isCurrentUserAdmin ? T.finalizingScores : T.calculatingScore) : 
                 (isCurrentUserAdmin ? T.confirmSubmissionsAdminButton : T.confirmSubmissionsPlayerButton)
@@ -596,6 +609,12 @@ export default function RealtimeReviewPage() {
           </CardFooter>
         </Card>
       </div>
+      {/* Advertencia de nombres duplicados */}
+      {duplicateNames.length > 0 && (
+        <div className="text-center text-yellow-700 bg-yellow-100 rounded-md p-2 my-2">
+          {T.errorLoadingSubmissions}: {duplicateNames.join(', ')}
+        </div>
+      )}
     </PageWrapper>
   );
 }

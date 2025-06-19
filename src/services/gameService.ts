@@ -82,27 +82,17 @@ export class GameService {
   }
   // Unirse a una sala
   static async joinRoom(roomId: string, player: Player): Promise<void> {
-    console.log('🚪 GameService - joinRoom called', { roomId, playerId: player.id, playerName: player.name });
     const roomRef = doc(db, 'rooms', roomId);
     const roomSnap = await getDoc(roomRef);
-    
     if (!roomSnap.exists()) {
-      console.log('❌ GameService - Room not found');
       throw new Error('Room not found');
     }
-
     const room = roomSnap.data() as Room;
-    
-    // Verificar que el jugador no esté ya en la sala
     if (!room.players.find(p => p.id === player.id)) {
-      console.log('✅ GameService - Adding player to room');
       await updateDoc(roomRef, {
         players: arrayUnion({ ...player, joinedAt: new Date() }),
         updatedAt: new Date()
       });
-      console.log('✅ GameService - Player successfully added');
-    } else {
-      console.log('⚠️ GameService - Player already in room');
     }
   }
 
@@ -142,8 +132,6 @@ export class GameService {
   // Iniciar una nueva ronda
   static async startRound(roomId: string, roundNumber: number, letter: string): Promise<void> {
     const roomRef = doc(db, 'rooms', roomId);
-    
-    // Actualizar estado de la sala
     await updateDoc(roomRef, {
       'settings.currentRound': roundNumber,
       'settings.gameStatus': 'playing',
@@ -151,8 +139,7 @@ export class GameService {
       'settings.roundStartTime': new Date(),
       updatedAt: new Date()
     });
-
-    // Crear documento de ronda
+    // Crear documento de ronda en subcolección
     const roundData: RoundData = {
       roomId,
       roundNumber,
@@ -162,26 +149,20 @@ export class GameService {
       isFinalized: false,
       startTime: new Date()
     };
-
-    await setDoc(doc(db, 'rounds', `${roomId}_${roundNumber}`), roundData);
+    await setDoc(doc(db, 'rooms', roomId, 'rounds', String(roundNumber)), roundData);
   }
 
   // Enviar palabras de un jugador
   static async submitWords(roomId: string, roundNumber: number, submissions: PlayerSubmission[]): Promise<void> {
-    const roundRef = doc(db, 'rounds', `${roomId}_${roundNumber}`);
+    const roundRef = doc(db, 'rooms', roomId, 'rounds', String(roundNumber));
     const roundSnap = await getDoc(roundRef);
-    
     if (!roundSnap.exists()) {
       throw new Error('Round not found');
     }
-
     const roundData = roundSnap.data() as RoundData;
-    
-    // Filtrar submissions existentes del mismo jugador y agregar las nuevas
     const filteredSubmissions = roundData.submissions.filter(
-      s => s.playerId !== submissions[0]?.playerId
+      (s: PlayerSubmission) => s.playerId !== submissions[0]?.playerId
     );
-    
     await updateDoc(roundRef, {
       submissions: [...filteredSubmissions, ...submissions]
     });
@@ -189,25 +170,20 @@ export class GameService {
 
   // Finalizar ronda con puntuaciones
   static async finalizeRound(roomId: string, roundNumber: number, playerScores: Record<string, number>): Promise<void> {
-    const roundRef = doc(db, 'rounds', `${roomId}_${roundNumber}`);
+    const roundRef = doc(db, 'rooms', roomId, 'rounds', String(roundNumber));
     const roomRef = doc(db, 'rooms', roomId);
-    
-    // Actualizar puntuaciones de la ronda
     await updateDoc(roundRef, {
       playerScores,
       isFinalized: true,
       endTime: new Date()
     });
-
-    // Actualizar puntuaciones totales de los jugadores
     const roomSnap = await getDoc(roomRef);
     if (roomSnap.exists()) {
       const room = roomSnap.data() as Room;
-      const updatedPlayers = room.players.map(player => ({
+      const updatedPlayers = room.players.map((player: Player) => ({
         ...player,
         score: player.score + (playerScores[player.id] || 0)
       }));
-
       await updateDoc(roomRef, {
         players: updatedPlayers,
         'settings.gameStatus': 'reviewing',
@@ -217,14 +193,8 @@ export class GameService {
   }
   // Escuchar cambios en una sala
   static subscribeToRoom(roomId: string, callback: (room: Room | null) => void): () => void {
-    console.log('📡 GameService - subscribeToRoom called for:', roomId);
     const roomRef = doc(db, 'rooms', roomId);
     return onSnapshot(roomRef, (doc) => {
-      console.log('🏠 GameService - Room snapshot received', { 
-        roomId, 
-        exists: doc.exists(),
-        data: doc.exists() ? 'Room data available' : 'No data'
-      });
       if (doc.exists()) {
         callback(doc.data() as Room);
       } else {
@@ -234,15 +204,8 @@ export class GameService {
   }
   // Escuchar cambios en una ronda
   static subscribeToRound(roomId: string, roundNumber: number, callback: (round: RoundData | null) => void): () => void {
-    console.log('🎯 GameService - subscribeToRound called for:', { roomId, roundNumber });
-    const roundRef = doc(db, 'rounds', `${roomId}_${roundNumber}`);
+    const roundRef = doc(db, 'rooms', roomId, 'rounds', String(roundNumber));
     return onSnapshot(roundRef, (doc) => {
-      console.log('📊 GameService - Round snapshot received', { 
-        roomId, 
-        roundNumber,
-        exists: doc.exists(),
-        data: doc.exists() ? 'Round data available' : 'No data'
-      });
       if (doc.exists()) {
         callback(doc.data() as RoundData);
       } else {
@@ -268,6 +231,20 @@ export class GameService {
     await updateDoc(roomRef, {
       'settings.gameStatus': 'finished',
       updatedAt: new Date()
+    });
+  }
+
+  /**
+   * Inicia una ronda y establece la marca de tiempo final del temporizador en Firestore.
+   * @param roomId ID de la sala
+   * @param roundNumber Número de ronda
+   * @param durationSeconds Duración del timer en segundos
+   */
+  static async startRoundWithTimer(roomId: string, roundNumber: number, durationSeconds: number): Promise<void> {
+    const roundRef = doc(db, 'rooms', roomId, 'rounds', String(roundNumber));
+    const timerEndAt = new Date(Date.now() + durationSeconds * 1000);
+    await updateDoc(roundRef, {
+      timerEndAt
     });
   }
 }

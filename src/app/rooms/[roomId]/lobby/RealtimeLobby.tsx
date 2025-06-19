@@ -1,7 +1,7 @@
 // src/app/rooms/[roomId]/lobby/RealtimeLobby.tsx
 "use client";
 
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import PageWrapper from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,8 @@ import { ArrowRight, Info, Users, Settings, Play, UserCog, Zap, Crown, Clock } f
 import { useUser } from '@/contexts/UserContext';
 import { useRouter } from 'next/navigation';
 import RealtimeNotifications from '@/components/game/RealtimeNotifications';
+import { GameService } from '@/services/gameService';
+import { useToast } from '@/hooks/use-toast';
 
 interface RealtimeLobbyProps {
   roomId: string;
@@ -85,6 +87,8 @@ export default function RealtimeLobby({ roomId }: RealtimeLobbyProps) {
   const T = translations[uiLanguage as keyof typeof translations] || translations.en;
   const hasJoined = useRef(false);
   const hasRedirected = useRef(false);
+  const { toast } = useToast();
+  const [isStarting, setIsStarting] = useState(false);
 
   console.log('👤 RealtimeLobby - User context', { username, uiLanguage });
   const {
@@ -136,18 +140,34 @@ export default function RealtimeLobby({ roomId }: RealtimeLobbyProps) {
       router.push(`/rooms/${roomId}/play`);
     }
   }, [room?.settings.gameStatus, roomId, router]);
+  // Redirigir si el usuario ya no está en la lista de jugadores
+  useEffect(() => {
+    if (room && username && !room.players.some(p => p.name === username)) {
+      toast({ variant: 'destructive', title: T.leaveLobbyButton, description: T.roomNotFoundToast });
+      router.push('/');
+    }
+  }, [room, username, router, toast]);
+
+  // Advertencia si hay nombres duplicados
+  const duplicateNames = room?.players?.map(p => p.name).filter((name, idx, arr) => arr.indexOf(name) !== idx && arr.lastIndexOf(name) === idx) || [];
+
   const handleStartGame = async () => {
-    if (!isAdminValue || !room) return;
-    
+    if (!isAdminValue || !room || isStarting) return;
+    setIsStarting(true);
     try {
       // Generar letra aleatoria para la primera ronda
       const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
       const randomLetter = letters[Math.floor(Math.random() * letters.length)];
-      
+      const durationSeconds = room.settings.timePerRound || 60;
+      // 1. Establecer timerEndAt en Firestore
+      await GameService.startRoundWithTimer(roomId, 1, durationSeconds);
+      // 2. Cambiar estado de la sala a playing y setear letra
       await startRound(1, randomLetter);
+      toast({ variant: 'success', title: T.gameStarted });
     } catch (error) {
-      console.error('Error starting game:', error);
+      toast({ variant: 'destructive', title: T.errorUpdatingAdmin });
     }
+    setIsStarting(false);
   };
 
   const handleLeaveRoom = async () => {
@@ -266,9 +286,9 @@ export default function RealtimeLobby({ roomId }: RealtimeLobbyProps) {
                   <Button 
                     onClick={handleStartGame} 
                     className="w-full text-lg py-6 bg-primary hover:bg-primary/90"
-                    disabled={room.players.length < 1}
+                    disabled={room.players.length < 2 || isStarting}
                   >
-                    <Play className="mr-2 h-6 w-6"/>
+                    {isStarting ? <span className="animate-spin mr-2 h-6 w-6 border-b-2 border-white rounded-full inline-block"/> : <Play className="mr-2 h-6 w-6"/>}
                     {T.startGameButton}
                   </Button>
                 </CardContent>
@@ -277,6 +297,13 @@ export default function RealtimeLobby({ roomId }: RealtimeLobbyProps) {
             {!isAdminValue && room.settings.gameStatus === 'waiting' && (
               <div className="text-center text-muted-foreground p-4 bg-muted rounded-md">
                 {T.waitingForAdmin(room.settings.admin)}
+              </div>
+            )}
+
+            {/* Advertencia de nombres duplicados */}
+            {duplicateNames.length > 0 && (
+              <div className="text-center text-yellow-700 bg-yellow-100 rounded-md p-2 my-2">
+                {T.errorUpdatingAdmin}: {duplicateNames.join(', ')}
               </div>
             )}
 

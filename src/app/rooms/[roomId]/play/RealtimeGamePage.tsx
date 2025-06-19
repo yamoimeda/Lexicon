@@ -12,7 +12,9 @@ import { Label } from '@/components/ui/label';
 import { Send, Clock, Users, Gamepad2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { useGameRoom } from '@/hooks/useGameRoom';
+import { useSynchronizedTimer } from '@/hooks/useSynchronizedTimer';
 import RealtimeNotifications from '@/components/game/RealtimeNotifications';
+import { useToast } from '@/hooks/use-toast';
 
 interface RealtimeGamePageProps {
   roomId: string;
@@ -71,6 +73,7 @@ const translations = {
 export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
   const { username, language: uiLanguage } = useUser();
   const router = useRouter();
+  const { toast } = useToast();
   const T = translations[uiLanguage as keyof typeof translations] || translations.en;
 
   const {
@@ -82,8 +85,10 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
   } = useGameRoom(roomId);
 
   const [wordSubmissions, setWordSubmissions] = useState<CategoryWordSubmission[]>([]);
-  const [timeLeft, setTimeLeft] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Hook de timer sincronizado
+  const timeLeft = useSynchronizedTimer(roomId, currentRound);
 
   // Inicializar submissions cuando cambien las categorías
   useEffect(() => {      if (room?.settings.categories) {
@@ -96,12 +101,12 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
       }
     }, [room?.settings.categories]);
 
-  // Inicializar timer cuando comience la ronda
+  // Auto-submit cuando el timer llega a 0
   useEffect(() => {
-    if (room?.settings.gameStatus === 'playing' && room.settings.timePerRound) {
-      setTimeLeft(room.settings.timePerRound);
+    if (timeLeft === 0 && room?.settings.gameStatus === 'playing' && !isSubmitting) {
+      handleTimeUp();
     }
-  }, [room?.settings.gameStatus, room?.settings.timePerRound]);
+  }, [timeLeft, room?.settings.gameStatus, isSubmitting, handleTimeUp]);
 
   // Redirigir cuando el juego termine o cambie de estado
   useEffect(() => {
@@ -119,6 +124,14 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
         break;
     }  }, [room?.settings.gameStatus, room?.settings.currentRound, roomId, router]);
 
+  // Redirigir si el usuario ya no está en la lista de jugadores
+  useEffect(() => {
+    if (room && username && !room.players.some((p: any) => p.name === username)) {
+      toast({ variant: 'destructive', title: T.errorLoadingRoomSettings });
+      router.push('/');
+    }
+  }, [room, username, router, toast]);
+
   const handleWordChange = useCallback((category: string, newWord: string) => {
     setWordSubmissions((prevWords: CategoryWordSubmission[]) =>
       prevWords.map((cw: CategoryWordSubmission) =>
@@ -126,49 +139,46 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
       )
     );
   }, []);
-  const handleSubmitWords = useCallback(async () => {
-    if (!room || !username || isSubmitting) return;
-    
-    setIsSubmitting(true);
-    
-    try {
-      // Filtrar palabras vacías
-      const wordsToSubmit = wordSubmissions.filter((w: CategoryWordSubmission) => w.word.trim() !== '');
-      
-      await submitWords(wordsToSubmit);
-      
-      // Removed toast notification to avoid infinite loops
-      console.log('✅ Words submitted successfully!');
+  // Advertencia si hay nombres duplicados
+  const duplicateNames = room?.players?.map((p: any) => p.name).filter((name: string, idx: number, arr: string[]) => arr.indexOf(name) !== idx && arr.lastIndexOf(name) === idx) || [];
 
-      // Si es modo "endRoundOnFirstSubmit", el juego cambiará automáticamente a reviewing
-      // Si no, el usuario puede seguir editando hasta que se acabe el tiempo
-      if (room.settings.endRoundOnFirstSubmit) {
-        setIsSubmitting(false); // El useEffect manejará la redirección
-      } else {
-        setIsSubmitting(false);
-      }
-      
+  const handleSubmitWords = useCallback(async () => {
+    if (!room || !username || isSubmitting || timeLeft === 0) return;
+    setIsSubmitting(true);
+    try {
+      const wordsToSubmit = wordSubmissions.filter((w: CategoryWordSubmission) => w.word.trim() !== '');
+      await submitWords(wordsToSubmit);
+      toast({ variant: 'success', title: T.submitting });
+      setIsSubmitting(false);
     } catch (error) {
-      console.error('❌ Error submitting words:', error);
-      // Removed toast notification to avoid infinite loops
+      toast({ variant: 'destructive', title: T.errorLoadingRoomSettings });
       setIsSubmitting(false);
     }
-  }, [room, username, wordSubmissions, submitWords, isSubmitting]);
+  }, [room, username, wordSubmissions, submitWords, isSubmitting, timeLeft, toast, T]);
   // Handle time up submission
   const handleTimeUp = useCallback(() => {
     handleSubmitWords();
   }, [handleSubmitWords]);
 
-  // Timer countdown
+  // Robustez: Si el admin está en la página de juego y el tiempo llega a 0, pasar a revisión automáticamente
+  const isCurrentUserAdmin = room && username && room.settings.admin === username;
   useEffect(() => {
-    if (timeLeft > 0 && room?.settings.gameStatus === 'playing' && !isSubmitting) {
-      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-      return () => clearTimeout(timer);
-    } else if (timeLeft === 0 && room?.settings.gameStatus === 'playing' && !isSubmitting) {
-      // Auto-submit cuando se acabe el tiempo
-      handleTimeUp();
+    if (
+      isCurrentUserAdmin &&
+      timeLeft === 0 &&
+      room?.settings.gameStatus === 'playing'
+    ) {
+      const finalize = async () => {
+        try {
+          await GameService.finalizeRound(roomId, room.settings.currentRound, {});
+          toast({ variant: 'success', title: 'Ronda finalizada, pasando a revisión.' });
+        } catch (e) {
+          toast({ variant: 'destructive', title: 'Error al finalizar la ronda.' });
+        }
+      };
+      finalize();
     }
-  }, [timeLeft, room?.settings.gameStatus, isSubmitting, handleTimeUp]);
+  }, [isCurrentUserAdmin, timeLeft, room?.settings.gameStatus, roomId, room?.settings.currentRound, toast]);
 
   if (loading) {
     return (
@@ -266,7 +276,7 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
                     className="w-full text-lg py-3 bg-primary hover:bg-primary/90" 
                     disabled={isSubmitting || timeLeft === 0}
                   >
-                    <Send className="mr-2 h-5 w-5"/> 
+                    {isSubmitting ? <span className="animate-spin mr-2 h-5 w-5 border-b-2 border-white rounded-full inline-block"/> : <Send className="mr-2 h-5 w-5"/>}
                     {isSubmitting ? T.submitting : T.submitWordsForRound}
                   </Button>
                 )}
@@ -318,6 +328,27 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
           </Card>
         </div>
       </div>
+
+      {/* Advertencia de nombres duplicados */}
+      {duplicateNames.length > 0 && (
+        <div className="text-center text-yellow-700 bg-yellow-100 rounded-md p-2 my-2">
+          {T.errorLoadingRoomSettings}: {duplicateNames.join(', ')}
+        </div>
+      )}
+
+      {/* Botón para forzar paso a revisión si el admin lo desea */}
+      {isCurrentUserAdmin && timeLeft === 0 && room?.settings.gameStatus === 'playing' && (
+        <Button onClick={async () => {
+          try {
+            await GameService.finalizeRound(roomId, room.settings.currentRound, {});
+            toast({ variant: 'success', title: 'Ronda finalizada, pasando a revisión.' });
+          } catch (e) {
+            toast({ variant: 'destructive', title: 'Error al finalizar la ronda.' });
+          }
+        }} className="w-full bg-orange-600 hover:bg-orange-700 text-white text-lg py-3">
+          Forzar paso a revisión
+        </Button>
+      )}
     </PageWrapper>
   );
 }

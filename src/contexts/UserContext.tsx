@@ -16,6 +16,17 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
+/**
+ * UserContext proporciona:
+ * - username: string | null
+ * - login(name): inicia sesión y navega a home
+ * - logout(): cierra sesión y navega a login
+ * - isAuthenticated: boolean
+ * - language: string (código ISO)
+ * - setLanguage(lang): cambia idioma y lo persiste
+ *
+ * Puede integrarse fácilmente con autenticación real en el futuro.
+ */
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [username, setUsername] = useLocalStorage<string | null>('wordduel-username', null);
   const [language, setLanguageState] = useLocalStorage<string>('wordduel-language', 'en');
@@ -43,6 +54,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
   const isAuthenticated = !!username;
 
+  // El contexto es robusto y reactivo para login/logout/language
   return (
     <UserContext.Provider value={{ username, login, logout, isAuthenticated, language, setLanguage }}>
       {children}

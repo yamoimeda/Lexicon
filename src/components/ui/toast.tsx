@@ -127,3 +127,17 @@ export {
   ToastClose,
   ToastAction,
 }
+
+/**
+ * Toast UI Components
+ *
+ * Uso recomendado:
+ * - <ToastProvider> debe envolver la app.
+ * - Usar <Toast> con variantes: default, destructive, etc.
+ * - Usar <ToastTitle>, <ToastDescription>, <ToastAction>, <ToastClose> para personalizar.
+ * - Integrar con hooks como useToast para disparar toasts desde lógica de negocio.
+ * - Internacionalizar títulos y descripciones usando el sistema de traducciones global.
+ *
+ * Ejemplo:
+ *   toast({ variant: 'success', title: T.success, description: T.actionDone })
+ */

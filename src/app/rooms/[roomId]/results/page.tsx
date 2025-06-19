@@ -1,4 +1,3 @@
-
 // src/app/rooms/[roomId]/results/page.tsx
 "use client";
 
@@ -10,6 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Trophy, ListOrdered, RotateCcw, Home } from 'lucide-react';
 import { useGameRoom } from '@/hooks/useGameRoom';
+import { useToast } from '@/hooks/use-toast';
+import { onSnapshot, doc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface PlayerResult {
   id: string;
@@ -52,6 +54,7 @@ export default function ResultsPage() {
 
   const [results, setResults] = useState<PlayerResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -59,31 +62,40 @@ export default function ResultsPage() {
       return;
     }
     if (!roomId) {
+      router.push('/');
+      return;
+    }
+    setIsLoading(true);
+    // Sincronización reactiva desde Firestore
+    const unsub = onSnapshot(doc(db, 'rooms', roomId), (snap) => {
+      const data = snap.data();
+      if (!data || !data.players) {
+        setResults([]);
+        setIsLoading(false);
+        return;
+      }
+      // Redirigir si el usuario ya no está en la lista de jugadores
+      if (username && !data.players.some((p: any) => p.name === username)) {
+        toast({ variant: 'destructive', title: T.errorLoadingResults });
         router.push('/');
         return;
-    }
-
-    setIsLoading(true);
-    const playersRaw = localStorage.getItem(`room-${roomId}-players`);
-    if (playersRaw) {
-      try {
-        const playersData: PlayerResult[] = JSON.parse(playersRaw);
-        // Sort by score to determine rank
-        const sortedPlayers = [...playersData].sort((a, b) => b.score - a.score);
-        const rankedPlayers = sortedPlayers.map((player, index) => ({
-          ...player,
-          rank: index + 1,
-        }));
-        setResults(rankedPlayers);
-      } catch (e) {
-        console.error("Error parsing player results:", e);
-        setResults([]);
       }
-    } else {
-      setResults([]); // No data found
-    }
-    setIsLoading(false);
-  }, [isAuthenticated, router, roomId, T]);
+      // Advertencia si hay nombres duplicados
+      const duplicateNames = data.players.map((p: any) => p.name).filter((name: string, idx: number, arr: string[]) => arr.indexOf(name) !== idx && arr.lastIndexOf(name) === idx);
+      if (duplicateNames.length > 0) {
+        toast({ variant: 'warning', title: T.errorLoadingResults, description: duplicateNames.join(', ') });
+      }
+      // Ordenar y rankear
+      const sortedPlayers = [...data.players].sort((a: any, b: any) => b.score - a.score);
+      const rankedPlayers = sortedPlayers.map((player: any, index: number) => ({
+        ...player,
+        rank: index + 1,
+      }));
+      setResults(rankedPlayers);
+      setIsLoading(false);
+    });
+    return () => unsub();
+  }, [isAuthenticated, router, roomId, T, username, toast]);
 
 
   if (isLoading) {
