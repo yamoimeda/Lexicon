@@ -339,8 +339,13 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
         </div>
       )}
 
-      {/* Botón para forzar paso a revisión si el admin lo desea */}
-      {isCurrentUserAdmin && room?.settings.gameStatus === 'playing' && (
+      {/* Debug info para QA */}
+      <div className="my-4 p-2 bg-gray-100 text-xs rounded text-gray-700">
+        <strong>DEBUG:</strong> isCurrentUserAdmin: {String(isCurrentUserAdmin)} | gameStatus: {room?.settings.gameStatus} | admin: {room?.settings.admin} | username: {username}
+      </div>
+
+      {/* Botón para forzar paso a revisión (ahora visible para cualquier usuario si está en playing, para pruebas) */}
+      {room?.settings.gameStatus === 'playing' && (
         <Button onClick={async () => {
           try {
             await GameService.finalizeRound(roomId, room.settings.currentRound, {});
@@ -349,7 +354,7 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
             toast({ variant: 'destructive', title: 'Error al finalizar la ronda.' });
           }
         }} className="w-full bg-orange-600 hover:bg-orange-700 text-white text-lg py-3">
-          Forzar paso a revisión
+          Forzar paso a revisión (QA)
         </Button>
       )}
     </PageWrapper>
