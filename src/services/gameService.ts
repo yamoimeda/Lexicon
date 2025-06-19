@@ -243,8 +243,6 @@ export class GameService {
   static async startRoundWithTimer(roomId: string, roundNumber: number, durationSeconds: number): Promise<void> {
     const roundRef = doc(db, 'rooms', roomId, 'rounds', String(roundNumber));
     const timerEndAt = new Date(Date.now() + durationSeconds * 1000);
-    await updateDoc(roundRef, {
-      timerEndAt
-    });
+    await setDoc(roundRef, { timerEndAt }, { merge: true });
   }
 }

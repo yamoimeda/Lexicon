@@ -340,7 +340,7 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
       )}
 
       {/* Botón para forzar paso a revisión si el admin lo desea */}
-      {isCurrentUserAdmin && timeLeft === 0 && room?.settings.gameStatus === 'playing' && (
+      {isCurrentUserAdmin && room?.settings.gameStatus === 'playing' && (
         <Button onClick={async () => {
           try {
             await GameService.finalizeRound(roomId, room.settings.currentRound, {});
