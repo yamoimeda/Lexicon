@@ -254,6 +254,16 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
                 <p className="text-6xl font-headline font-bold tracking-widest text-primary">
                   {room.settings.currentLetter || '?'}
                 </p>
+                {/* DEBUG TIMER */}
+                <div className="mt-2 text-xs text-gray-500 bg-gray-100 rounded p-2">
+                  <div><strong>DEBUG TIMER</strong></div>
+                  <div>timerEndAt: {String(currentRound?.timerEndAt)}</div>
+                  <div>timeLeft: {String(timeLeft)}</div>
+                  <div>now: {String(Date.now())}</div>
+                  <div>roomId: {roomId}</div>
+                  <div>currentRound: {String(room?.settings.currentRound)}</div>
+                  <div>gameStatus: {String(room?.settings.gameStatus)}</div>
+                </div>
               </div>              <form onSubmit={(e: React.FormEvent) => { e.preventDefault(); handleSubmitWords(); }} className="space-y-4">
                 {wordSubmissions.map((cw: CategoryWordSubmission, index: number) => (
                   <Card key={index} className="p-4">
