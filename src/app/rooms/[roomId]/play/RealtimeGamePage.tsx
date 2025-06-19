@@ -15,6 +15,7 @@ import { useGameRoom } from '@/hooks/useGameRoom';
 import { useSynchronizedTimer } from '@/hooks/useSynchronizedTimer';
 import RealtimeNotifications from '@/components/game/RealtimeNotifications';
 import { useToast } from '@/hooks/use-toast';
+import { GameService } from '@/services/gameService';
 
 interface RealtimeGamePageProps {
   roomId: string;
@@ -90,6 +91,26 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
   // Hook de timer sincronizado
   const timeLeft = useSynchronizedTimer(roomId, currentRound);
 
+  // Handler para enviar palabras
+  const handleSubmitWords = useCallback(async () => {
+    if (!room || !username || isSubmitting || timeLeft === 0) return;
+    setIsSubmitting(true);
+    try {
+      const wordsToSubmit = wordSubmissions.filter((w: CategoryWordSubmission) => w.word.trim() !== '');
+      await submitWords(wordsToSubmit);
+      toast({ variant: 'success', title: T.submitting });
+      setIsSubmitting(false);
+    } catch (error) {
+      toast({ variant: 'destructive', title: T.errorLoadingRoomSettings });
+      setIsSubmitting(false);
+    }
+  }, [room, username, wordSubmissions, submitWords, isSubmitting, timeLeft, toast, T]);
+
+  // Handler para auto-submit cuando se acaba el tiempo
+  const handleTimeUp = useCallback(() => {
+    handleSubmitWords();
+  }, [handleSubmitWords]);
+
   // Inicializar submissions cuando cambien las categorías
   useEffect(() => {      if (room?.settings.categories) {
         setWordSubmissions(
@@ -141,24 +162,6 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
   }, []);
   // Advertencia si hay nombres duplicados
   const duplicateNames = room?.players?.map((p: any) => p.name).filter((name: string, idx: number, arr: string[]) => arr.indexOf(name) !== idx && arr.lastIndexOf(name) === idx) || [];
-
-  const handleSubmitWords = useCallback(async () => {
-    if (!room || !username || isSubmitting || timeLeft === 0) return;
-    setIsSubmitting(true);
-    try {
-      const wordsToSubmit = wordSubmissions.filter((w: CategoryWordSubmission) => w.word.trim() !== '');
-      await submitWords(wordsToSubmit);
-      toast({ variant: 'success', title: T.submitting });
-      setIsSubmitting(false);
-    } catch (error) {
-      toast({ variant: 'destructive', title: T.errorLoadingRoomSettings });
-      setIsSubmitting(false);
-    }
-  }, [room, username, wordSubmissions, submitWords, isSubmitting, timeLeft, toast, T]);
-  // Handle time up submission
-  const handleTimeUp = useCallback(() => {
-    handleSubmitWords();
-  }, [handleSubmitWords]);
 
   // Robustez: Si el admin está en la página de juego y el tiempo llega a 0, pasar a revisión automáticamente
   const isCurrentUserAdmin = room && username && room.settings.admin === username;
