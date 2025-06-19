@@ -21,11 +21,21 @@ export function useSynchronizedTimer(roomId: string, roundId: string | number) {
         let end: Date;
         try {
           end = data.timerEndAt.toDate ? data.timerEndAt.toDate() : new Date(data.timerEndAt);
-        } catch {
+        } catch (e) {
+          // DEPURACIÓN
+          console.log('[TIMER][ERROR] timerEndAt parse fail', { timerEndAt: data.timerEndAt, error: e });
           setTimeLeft(null);
           if (interval) clearInterval(interval);
           return;
         }
+        // DEPURACIÓN
+        console.log('[TIMER][DEBUG]', {
+          timerEndAt: data.timerEndAt,
+          endDate: end,
+          now: Date.now(),
+          diff: end.getTime() - Date.now(),
+          secondsLeft: Math.max(0, Math.floor((end.getTime() - Date.now()) / 1000))
+        });
         const update = () => setTimeLeft(Math.max(0, Math.floor((end.getTime() - Date.now()) / 1000)));
         update();
         if (interval) clearInterval(interval);
