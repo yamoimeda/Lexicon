@@ -17,6 +17,8 @@ export function useSynchronizedTimer(roomId: string, roundId: string | number) {
     let interval: NodeJS.Timeout | null = null;
     const unsubscribe = onSnapshot(roundRef, (snap: QueryDocumentSnapshot<DocumentData> | DocumentData) => {
       const data = snap.data();
+      // DEPURACIÓN: log siempre que se recibe un snapshot
+      console.log('[TIMER][SNAPSHOT]', { data });
       if (data?.timerEndAt) {
         let end: Date | null = null;
         let debugInfo: any = { timerEndAt: data.timerEndAt };
