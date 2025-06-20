@@ -13,10 +13,13 @@ export function useSynchronizedTimer(roomId: string, roundId: string | number) {
 
   useEffect(() => {
     if (!roomId || !roundId) return;
-    const roundRef = doc(db, 'rooms', roomId, 'rounds', String(roundId));
+    // CORREGIDO: La ruta correcta es 'rounds/{roundId}' (colección global), no subcolección de rooms
+    const roundRef = doc(db, 'rounds', String(roundId));
     let interval: NodeJS.Timeout | null = null;
     const unsubscribe = onSnapshot(roundRef, (snap: QueryDocumentSnapshot<DocumentData> | DocumentData) => {
-      const data = snap.data();
+      // DEPURACIÓN: log del snapshot completo
+      console.log('[TIMER][FULL SNAPSHOT]', { snap, exists: typeof snap.exists === 'function' ? snap.exists() : undefined, data: typeof snap.data === 'function' ? snap.data() : undefined });
+      const data = typeof snap.data === 'function' ? snap.data() : undefined;
       // DEPURACIÓN: log siempre que se recibe un snapshot
       console.log('[TIMER][SNAPSHOT]', { data });
       if (data?.timerEndAt) {
