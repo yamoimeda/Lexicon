@@ -71,7 +71,15 @@ export default function WaitRoundPage() {
   const router = useRouter();
   const params = useParams();
   const roomId = params.roomId as string;
-  const roundNumber = parseInt(params.roundNumber as string, 10);
+  let roundNumber = params.roundNumber;
+  console.log('[WAIT][DEBUG] roundNumber param:', roundNumber, 'type:', typeof roundNumber);
+  // Forzar a número si es posible
+  if (typeof roundNumber === 'object' && roundNumber !== null && 'roundNumber' in roundNumber) {
+    roundNumber = roundNumber.roundNumber;
+  }
+  roundNumber = Number(roundNumber);
+  console.log('[WAIT][DEBUG] roundNumber final:', roundNumber, 'type:', typeof roundNumber);
+
   const { toast } = useToast();
   const T = translations[uiLanguage as keyof typeof translations] || translations.en;
 
