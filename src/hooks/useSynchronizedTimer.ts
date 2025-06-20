@@ -13,8 +13,8 @@ export function useSynchronizedTimer(roomId: string, roundId: string | number) {
 
   useEffect(() => {
     if (!roomId || !roundId) return;
-    // CORREGIDO: La ruta correcta es 'rounds/{roundId}' (colección global), no subcolección de rooms
-    const roundRef = doc(db, 'rounds', String(roundId));
+    // MIGRADO: La ruta correcta es subcolección de la sala
+    const roundRef = doc(db, 'rooms', roomId, 'rounds', String(roundId));
     let interval: NodeJS.Timeout | null = null;
     const unsubscribe = onSnapshot(roundRef, (snap: QueryDocumentSnapshot<DocumentData> | DocumentData) => {
       // DEPURACIÓN: log del snapshot completo
