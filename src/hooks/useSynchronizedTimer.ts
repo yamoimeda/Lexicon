@@ -18,10 +18,20 @@ export function useSynchronizedTimer(roomId: string, roundId: string | number) {
     let interval: ReturnType<typeof setInterval> | null = null;
     const unsubscribe = onSnapshot(roomRef, (snap) => {
       const data = snap.data();
-      // Buscar la ronda actual en el array rounds
-      const round = data?.rounds?.find((r: any) => r.roundNumber === Number(roundId));
-      // DEPURACIÓN: log de la ronda encontrada
-      console.log('[TIMER][ROUND]', { round, allRounds: data?.rounds });
+      // Buscar la ronda actual en el array rounds (robusto: permite string o number)
+      const allRounds = data?.rounds || [];
+      const round = allRounds.find((r: any) => String(r.roundNumber) === String(roundId));
+      // DEPURACIÓN: log de la ronda encontrada y tipos de roundNumber
+      console.log('[TIMER][ROUND]', {
+        round,
+        allRounds,
+        roundId,
+        roundIdType: typeof roundId,
+        roundNumbers: allRounds.map((r: any) => ({
+          roundNumber: r.roundNumber,
+          type: typeof r.roundNumber,
+        })),
+      });
       if (round?.timerEndAt) {
         let end: Date | null = null;
         let debugInfo: any = { timerEndAt: round.timerEndAt };
