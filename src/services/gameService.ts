@@ -132,14 +132,7 @@ export class GameService {
   // Iniciar una nueva ronda
   static async startRound(roomId: string, roundNumber: number, letter: string): Promise<void> {
     const roomRef = doc(db, 'rooms', roomId);
-    await updateDoc(roomRef, {
-      'settings.currentRound': roundNumber,
-      'settings.gameStatus': 'playing',
-      'settings.currentLetter': letter,
-      'settings.roundStartTime': new Date(),
-      updatedAt: new Date()
-    });
-    // Crear documento de ronda en subcolección
+    // Construir la nueva ronda
     const roundData: RoundData = {
       roomId,
       roundNumber,
@@ -149,47 +142,80 @@ export class GameService {
       isFinalized: false,
       startTime: new Date()
     };
-    await setDoc(doc(db, 'rooms', roomId, 'rounds', String(roundNumber)), roundData);
+    // Agregar la ronda al array rounds (o crearlo si no existe)
+    const roomSnap = await getDoc(roomRef);
+    let rounds = [];
+    if (roomSnap.exists()) {
+      const room = roomSnap.data() as any;
+      rounds = Array.isArray(room.rounds) ? [...room.rounds] : [];
+      // Reemplazar si ya existe la ronda con ese número
+      const idx = rounds.findIndex((r: any) => r.roundNumber === roundNumber);
+      if (idx >= 0) {
+        rounds[idx] = roundData;
+      } else {
+        rounds.push(roundData);
+      }
+    } else {
+      rounds = [roundData];
+    }
+    await updateDoc(roomRef, {
+      'settings.currentRound': roundNumber,
+      'settings.gameStatus': 'playing',
+      'settings.currentLetter': letter,
+      'settings.roundStartTime': new Date(),
+      rounds,
+      updatedAt: new Date()
+    });
   }
 
   // Enviar palabras de un jugador
   static async submitWords(roomId: string, roundNumber: number, submissions: PlayerSubmission[]): Promise<void> {
-    const roundRef = doc(db, 'rooms', roomId, 'rounds', String(roundNumber));
-    const roundSnap = await getDoc(roundRef);
-    if (!roundSnap.exists()) {
-      throw new Error('Round not found');
+    const roomRef = doc(db, 'rooms', roomId);
+    const roomSnap = await getDoc(roomRef);
+    if (!roomSnap.exists()) {
+      throw new Error('Room not found');
     }
-    const roundData = roundSnap.data() as RoundData;
-    const filteredSubmissions = roundData.submissions.filter(
-      (s: PlayerSubmission) => s.playerId !== submissions[0]?.playerId
-    );
-    await updateDoc(roundRef, {
+    const room = roomSnap.data() as any;
+    let rounds = Array.isArray(room.rounds) ? [...room.rounds] : [];
+    const idx = rounds.findIndex((r: any) => r.roundNumber === roundNumber);
+    if (idx === -1) throw new Error('Round not found');
+    const roundData = rounds[idx];
+    const filteredSubmissions = Array.isArray(roundData.submissions)
+      ? roundData.submissions.filter((s: PlayerSubmission) => s.playerId !== submissions[0]?.playerId)
+      : [];
+    rounds[idx] = {
+      ...roundData,
       submissions: [...filteredSubmissions, ...submissions]
-    });
+    };
+    await updateDoc(roomRef, { rounds });
   }
 
   // Finalizar ronda con puntuaciones
   static async finalizeRound(roomId: string, roundNumber: number, playerScores: Record<string, number>): Promise<void> {
-    const roundRef = doc(db, 'rooms', roomId, 'rounds', String(roundNumber));
     const roomRef = doc(db, 'rooms', roomId);
-    await updateDoc(roundRef, {
+    const roomSnap = await getDoc(roomRef);
+    if (!roomSnap.exists()) throw new Error('Room not found');
+    const room = roomSnap.data() as any;
+    let rounds = Array.isArray(room.rounds) ? [...room.rounds] : [];
+    const idx = rounds.findIndex((r: any) => r.roundNumber === roundNumber);
+    if (idx === -1) throw new Error('Round not found');
+    rounds[idx] = {
+      ...rounds[idx],
       playerScores,
       isFinalized: true,
       endTime: new Date()
+    };
+    await updateDoc(roomRef, { rounds });
+    // Actualizar estado de la sala y puntajes
+    const updatedPlayers = room.players.map((player: Player) => ({
+      ...player,
+      score: player.score + (playerScores[player.id] || 0)
+    }));
+    await updateDoc(roomRef, {
+      players: updatedPlayers,
+      'settings.gameStatus': 'reviewing',
+      updatedAt: new Date()
     });
-    const roomSnap = await getDoc(roomRef);
-    if (roomSnap.exists()) {
-      const room = roomSnap.data() as Room;
-      const updatedPlayers = room.players.map((player: Player) => ({
-        ...player,
-        score: player.score + (playerScores[player.id] || 0)
-      }));
-      await updateDoc(roomRef, {
-        players: updatedPlayers,
-        'settings.gameStatus': 'reviewing',
-        updatedAt: new Date()
-      });
-    }
   }
   // Escuchar cambios en una sala
   static subscribeToRoom(roomId: string, callback: (room: Room | null) => void): () => void {

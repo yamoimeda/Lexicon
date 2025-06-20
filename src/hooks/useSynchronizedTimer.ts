@@ -13,31 +13,31 @@ export function useSynchronizedTimer(roomId: string, roundId: string | number) {
 
   useEffect(() => {
     if (!roomId || !roundId) return;
-    // MIGRADO: La ruta correcta es subcolección de la sala
-    const roundRef = doc(db, 'rooms', roomId, 'rounds', String(roundId));
-    let interval: NodeJS.Timeout | null = null;
-    const unsubscribe = onSnapshot(roundRef, (snap: QueryDocumentSnapshot<DocumentData> | DocumentData) => {
-      // DEPURACIÓN: log del snapshot completo
-      console.log('[TIMER][FULL SNAPSHOT]', { snap, exists: typeof snap.exists === 'function' ? snap.exists() : undefined, data: typeof snap.data === 'function' ? snap.data() : undefined });
-      const data = typeof snap.data === 'function' ? snap.data() : undefined;
-      // DEPURACIÓN: log siempre que se recibe un snapshot
-      console.log('[TIMER][SNAPSHOT]', { data });
-      if (data?.timerEndAt) {
+    // CAMBIO: Leer la ronda actual desde el array rounds dentro del documento de la sala
+    const roomRef = doc(db, 'rooms', roomId);
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const unsubscribe = onSnapshot(roomRef, (snap) => {
+      const data = snap.data();
+      // Buscar la ronda actual en el array rounds
+      const round = data?.rounds?.find((r: any) => r.roundNumber === Number(roundId));
+      // DEPURACIÓN: log de la ronda encontrada
+      console.log('[TIMER][ROUND]', { round, allRounds: data?.rounds });
+      if (round?.timerEndAt) {
         let end: Date | null = null;
-        let debugInfo: any = { timerEndAt: data.timerEndAt };
+        let debugInfo: any = { timerEndAt: round.timerEndAt };
         try {
-          if (typeof data.timerEndAt.toDate === 'function') {
-            end = data.timerEndAt.toDate();
+          if (typeof round.timerEndAt.toDate === 'function') {
+            end = round.timerEndAt.toDate();
             debugInfo.method = 'toDate';
           } else if (
-            typeof data.timerEndAt === 'object' &&
-            typeof data.timerEndAt.seconds === 'number' &&
-            typeof data.timerEndAt.nanoseconds === 'number'
+            typeof round.timerEndAt === 'object' &&
+            typeof round.timerEndAt.seconds === 'number' &&
+            typeof round.timerEndAt.nanoseconds === 'number'
           ) {
-            end = new Date(data.timerEndAt.seconds * 1000 + Math.floor(data.timerEndAt.nanoseconds / 1e6));
+            end = new Date(round.timerEndAt.seconds * 1000 + Math.floor(round.timerEndAt.nanoseconds / 1e6));
             debugInfo.method = 'manual seconds+nanoseconds';
           } else {
-            end = new Date(data.timerEndAt);
+            end = new Date(round.timerEndAt);
             debugInfo.method = 'Date constructor fallback';
           }
         } catch (e) {

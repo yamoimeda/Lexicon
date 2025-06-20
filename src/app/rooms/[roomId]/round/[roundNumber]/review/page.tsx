@@ -1,4 +1,3 @@
-
 // src/app/rooms/[roomId]/round/[roundNumber]/review/page.tsx
 "use client";
 
@@ -14,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { GameService, Player, Room, RoundData, PlayerSubmission } from '@/services/gameService';
+import { onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface Player {
   id: string;
@@ -158,14 +159,11 @@ export default function ReviewRoundPage() {
   const [roomSettings, setRoomSettings] = useState<StoredRoomSettings | null>(null);
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [isCurrentUserAdmin, setIsCurrentUserAdmin] = useState(false);
-
-  // For player's own review
   const [playerReviewData, setPlayerReviewData] = useState<PlayerRoundReviewData[]>([]);
-  // For admin's aggregated review
   const [adminAggregatedData, setAdminAggregatedData] = useState<AggregatedCategoryView[]>([]);
-
   const [isLoading, setIsLoading] = useState(true);
   const [isConfirming, setIsConfirming] = useState(false);
+  const [round, setRound] = useState<any>(null);
 
   useEffect(() => {
     if (!isAuthenticated || !username) {
@@ -176,89 +174,54 @@ export default function ReviewRoundPage() {
       router.replace('/');
       return;
     }
-
     setIsLoading(true);
-    const storedSettingsRaw = localStorage.getItem(`room-${roomId}-settings`);
-    if (storedSettingsRaw) {
-      const parsedSettings: StoredRoomSettings = JSON.parse(storedSettingsRaw);
-      setRoomSettings(parsedSettings);
-      setIsCurrentUserAdmin(parsedSettings.admin === username);
-
-      const storedPlayersRaw = localStorage.getItem(`room-${roomId}-players`);
-      if (storedPlayersRaw) {
-        setAllPlayers(JSON.parse(storedPlayersRaw));
+    const unsub = onSnapshot(doc(db, 'rooms', roomId), (snap) => {
+      const data = snap.data();
+      if (!data) {
+        toast({ variant: 'destructive', title: T.errorLoadingSettings });
+        router.push(`/rooms/${roomId}/lobby`);
+        return;
       }
-
-      if (parsedSettings.admin === username) { // Admin loads all data
-        loadAdminData(parsedSettings, JSON.parse(storedPlayersRaw || "[]"));
-      } else { // Player loads their own data
-        loadPlayerData(parsedSettings);
+      setRoomSettings(data.settings);
+      setAllPlayers(data.players || []);
+      setIsCurrentUserAdmin(data.settings?.admin === username);
+      // Buscar la ronda actual en el array rounds
+      const foundRound = Array.isArray(data.rounds) ? data.rounds.find((r: any) => r.roundNumber === roundNumber) : null;
+      setRound(foundRound);
+      // Para el jugador: filtrar submissions propias
+      if (foundRound && foundRound.submissions && !isCurrentUserAdmin) {
+        setPlayerReviewData(foundRound.submissions.filter((s: any) => s.playerName === username));
       }
-
-    } else {
-      toast({ variant: "destructive", title: T.errorLoadingSettings });
-      router.push(`/rooms/${roomId}/lobby`); // Go to lobby if settings missing
-      return;
-    }
-    setIsLoading(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, roundNumber, username, isAuthenticated, router, toast, T]); // Dependencies intentionally limited
-
-  const loadPlayerData = (settings: StoredRoomSettings) => {
-    const playerSubmissionsRaw = localStorage.getItem(`room-${roomId}-round-${roundNumber}-player-${username}-submissions`);
-    if (playerSubmissionsRaw) {
-      const parsedSubmissions: Array<{ category: string, word: string, isValid?: boolean, validationReason?: string }> = JSON.parse(playerSubmissionsRaw);
-      setPlayerReviewData(parsedSubmissions.map(s => ({
-        category: s.category,
-        word: s.word,
-        isValid: s.isValid, // Keep pre-validated status if exists
-        validationReason: s.validationReason,
-        isLoading: false
-      })));
-    } else {
-      toast({ variant: "destructive", title: T.errorLoadingSubmissions });
-      router.push(`/rooms/${roomId}/play`);
-    }
-  };
-
-  const loadAdminData = async (settings: StoredRoomSettings, players: Player[]) => {
-    const allSubmissions: Record<string, PlayerSubmission[]> = {}; // playerName: submissions[]
-    for (const player of players) {
-      const submissionsRaw = localStorage.getItem(`room-${roomId}-round-${roundNumber}-player-${player.name}-submissions`);
-      if (submissionsRaw) {
-        allSubmissions[player.name] = JSON.parse(submissionsRaw);
-      } else {
-        allSubmissions[player.name] = []; // Player might not have submissions
-      }
-    }
-
-    const categories = settings.categories.split(',').map(c => c.trim());
-    const aggregated: AggregatedCategoryView[] = [];
-
-    for (const category of categories) {
-      const categoryWords: Record<string, AggregatedWordInfo> = {}; // word: AggregatedWordInfo
-      for (const player of players) {
-        const playerSubmissionsForCat = (allSubmissions[player.name] || []).filter(s => s.category === category && s.word && s.word.trim() !== "");
-        for (const sub of playerSubmissionsForCat) {
-          if (!categoryWords[sub.word]) {
-            categoryWords[sub.word] = {
-              word: sub.word,
-              submittedBy: [],
-              isValidByAdmin: undefined, // Initially undefined
-              isAiValidating: false,
-              aiValidated: false,
-            };
+      // Para el admin: agrupar submissions de todos
+      if (foundRound && foundRound.submissions && isCurrentUserAdmin) {
+        const categories = data.settings.categories;
+        const aggregated: AggregatedCategoryView[] = [];
+        for (const category of categories) {
+          const categoryWords: Record<string, AggregatedWordInfo> = {};
+          for (const submission of foundRound.submissions) {
+            if (submission.category !== category || !submission.word) continue;
+            if (!categoryWords[submission.word]) {
+              categoryWords[submission.word] = {
+                word: submission.word,
+                submittedBy: [],
+                isValidByAdmin: undefined,
+                isAiValidating: false,
+                aiValidated: false,
+              };
+            }
+            categoryWords[submission.word].submittedBy.push({ playerName: submission.playerName });
           }
-          categoryWords[sub.word].submittedBy.push({ playerName: player.name });
+          aggregated.push({
+            categoryName: category,
+            words: Object.values(categoryWords).sort((a,b) => b.submittedBy.length - a.submittedBy.length),
+          });
         }
+        setAdminAggregatedData(aggregated);
       }
-      aggregated.push({
-        categoryName: category,
-        words: Object.values(categoryWords).sort((a,b) => b.submittedBy.length - a.submittedBy.length), // Show most submitted first
-      });
-    }
-    setAdminAggregatedData(aggregated);
-  };
+      setIsLoading(false);
+    });
+    return () => unsub();
+  }, [roomId, roundNumber, username, isAuthenticated, router, toast, T, isCurrentUserAdmin]);
 
   // For player's own validation
   const handlePlayerValidateSingleWord = async (index: number) => {
