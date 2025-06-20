@@ -53,6 +53,7 @@ export default function ResultsPage() {
   const T = translations[uiLanguage as keyof typeof translations] || translations.en;
 
   const [results, setResults] = useState<PlayerResult[]>([]);
+  const [rounds, setRounds] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
@@ -71,6 +72,7 @@ export default function ResultsPage() {
       const data = snap.data();
       if (!data || !data.players) {
         setResults([]);
+        setRounds([]);
         setIsLoading(false);
         return;
       }
@@ -92,6 +94,7 @@ export default function ResultsPage() {
         rank: index + 1,
       }));
       setResults(rankedPlayers);
+      setRounds(Array.isArray(data.rounds) ? data.rounds : []);
       setIsLoading(false);
     });
     return () => unsub();
@@ -155,7 +158,40 @@ export default function ResultsPage() {
                 ))}
               </ul>
             </div>
-
+            {/* Desglose por ronda para el jugador actual */}
+            {username && rounds.length > 0 && (
+              <div className="mt-8">
+                <h4 className="text-lg font-semibold mb-2 text-primary">Desglose por ronda</h4>
+                <table className="w-full text-sm border">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="p-2 border">Ronda</th>
+                      <th className="p-2 border">Letra</th>
+                      <th className="p-2 border">Puntos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rounds.map((round, idx) => {
+                      const score = round.playerScores && round.playerScores[username] ? round.playerScores[username] : 0;
+                      return (
+                        <tr key={idx} className="border-b">
+                          <td className="p-2 border text-center">{round.roundNumber}</td>
+                          <td className="p-2 border text-center">{round.letter}</td>
+                          <td className="p-2 border text-center font-bold">{score} {T.pointsSuffix}</td>
+                        </tr>
+                      );
+                    })}
+                    {/* Total row */}
+                    <tr className="font-bold bg-muted/30">
+                      <td className="p-2 border text-center" colSpan={2}>Total</td>
+                      <td className="p-2 border text-center font-bold">
+                        {rounds.reduce((acc, round) => acc + (round.playerScores && round.playerScores[username] ? round.playerScores[username] : 0), 0)} {T.pointsSuffix}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-6">
               <Button onClick={() => router.push(`/rooms/${roomId}/lobby`)} variant="outline" className="w-full sm:w-auto">
                 <RotateCcw className="mr-2 h-5 w-5" /> {T.playAgainButton}

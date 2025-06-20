@@ -306,23 +306,24 @@ export default function ReviewRoundPage() {
 
     if (isCurrentUserAdmin) {
       // Admin finalizes scores for everyone
-      const playerRoundScores: Record<string, number> = {}; // playerName: score
+      const playerRoundScores: Record<string, number> = {};
       allPlayers.forEach(p => playerRoundScores[p.name] = 0);
-
+      // Construir submissions validadas para guardar en Firestore
+      let validatedSubmissions: any[] = [];
       for (const catView of adminAggregatedData) {
         for (const wordInfo of catView.words) {
           if (wordInfo.isValidByAdmin === undefined && wordInfo.word.trim() !== "" && !wordInfo.aiValidated) {
-            // If admin hasn't touched it and AI hasn't run, run AI validation now
-             try {
-                const input: ValidateWordInput = { word: wordInfo.word, category: catView.categoryName, language: roomSettings.language };
-                const result = await validateWord(input);
-                wordInfo.isValidByAdmin = result.isValid; // Update local state for scoring
-             } catch (e) {
-                console.error("Error auto-validating during admin confirm:", e);
-                wordInfo.isValidByAdmin = false; // Default to invalid on error
-             }
+            try {
+              const input: ValidateWordInput = { word: wordInfo.word, category: catView.categoryName, language: roomSettings.language };
+              const result = await validateWord(input);
+              wordInfo.isValidByAdmin = result.isValid;
+              wordInfo.validationReasonByAdmin = result.reason;
+            } catch (e) {
+              wordInfo.isValidByAdmin = false;
+              wordInfo.validationReasonByAdmin = "Validation error";
+            }
           }
-
+          // Asignar puntos
           if (wordInfo.isValidByAdmin === true) {
             const submitterCount = wordInfo.submittedBy.length;
             let points = 0;
@@ -330,26 +331,43 @@ export default function ReviewRoundPage() {
             else if (submitterCount === 2) points = 75;
             else if (submitterCount === 3) points = 50;
             else if (submitterCount >= 4) points = 25;
-
             wordInfo.submittedBy.forEach(submitter => {
               playerRoundScores[submitter.playerName] = (playerRoundScores[submitter.playerName] || 0) + points;
             });
           }
+          // Guardar submission validada para cada submitter
+          wordInfo.submittedBy.forEach(submitter => {
+            validatedSubmissions.push({
+              category: catView.categoryName,
+              word: wordInfo.word,
+              playerName: submitter.playerName,
+              isValid: wordInfo.isValidByAdmin,
+              validationReason: wordInfo.validationReasonByAdmin
+            });
+          });
         }
       }
-
-      // Update total player scores and save individual round scores
-      let updatedPlayers = [...allPlayers];
-      allPlayers.forEach(player => {
-        const roundScore = playerRoundScores[player.name] || 0;
-        localStorage.setItem(`room-${roomId}-round-${roundNumber}-player-${player.name}-roundScore`, JSON.stringify(roundScore));
-        updatedPlayers = updatedPlayers.map(p =>
-          p.name === player.name ? { ...p, score: p.score + roundScore } : p
-        );
-      });
-      localStorage.setItem(`room-${roomId}-players`, JSON.stringify(updatedPlayers));
+      // Actualizar Firestore: sobrescribir submissions y playerScores de la ronda
+      try {
+        const roomRef = doc(db, 'rooms', roomId);
+        const roomSnap = await roomRef.get();
+        const data = roomSnap.data();
+        let rounds = Array.isArray(data.rounds) ? [...data.rounds] : [];
+        const idx = rounds.findIndex((r: any) => r.roundNumber === roundNumber);
+        if (idx !== -1) {
+          rounds[idx] = {
+            ...rounds[idx],
+            submissions: validatedSubmissions,
+            playerScores: playerRoundScores,
+            isFinalized: true,
+            endTime: new Date()
+          };
+          await updateDoc(roomRef, { rounds });
+        }
+      } catch (e) {
+        toast({ variant: 'destructive', title: 'Error al guardar validaciones en Firestore' });
+      }
       toast({ title: T.adminScoresFinalizedToast });
-
     } else {
       // Player confirms their own (preliminary) validations
       let playerScore = 0;
