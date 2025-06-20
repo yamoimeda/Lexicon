@@ -1,32 +1,32 @@
 import { useEffect, useState } from 'react';
-import { onSnapshot, doc, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { onSnapshot, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 /**
- * Sincroniza el temporizador de una ronda usando la marca de tiempo final almacenada en Firestore.
+ * Sincroniza el temporizador de la ronda activa usando el valor de settings.currentRound en Firestore.
  * @param roomId ID de la sala
- * @param roundId ID de la ronda (puede ser string o number)
  * @returns segundos restantes (number) o null si no hay timer
  */
-export function useSynchronizedTimer(roomId: string, roundId: string | number) {
+export function useSynchronizedTimer(roomId: string) {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!roomId || !roundId) return;
-    // CAMBIO: Leer la ronda actual desde el array rounds dentro del documento de la sala
+    if (!roomId) return;
     const roomRef = doc(db, 'rooms', roomId);
     let interval: ReturnType<typeof setInterval> | null = null;
     const unsubscribe = onSnapshot(roomRef, (snap) => {
       const data = snap.data();
-      // Buscar la ronda actual en el array rounds (robusto: permite string o number)
+      // Obtener el número de ronda actual desde settings
+      const currentRound = data?.settings?.currentRound;
       const allRounds = data?.rounds || [];
-      const round = allRounds.find((r: any) => String(r.roundNumber) === String(roundId));
+      // Buscar la ronda actual en el array rounds
+      const round = allRounds.find((r: any) => String(r.roundNumber) === String(currentRound));
       // DEPURACIÓN: log de la ronda encontrada y tipos de roundNumber
       console.log('[TIMER][ROUND]', {
         round,
         allRounds,
-        roundId,
-        roundIdType: typeof roundId,
+        currentRound,
+        currentRoundType: typeof currentRound,
         roundNumbers: allRounds.map((r: any) => ({
           roundNumber: r.roundNumber,
           type: typeof r.roundNumber,
@@ -72,10 +72,10 @@ export function useSynchronizedTimer(roomId: string, roundId: string | number) {
       }
     });
     return () => {
-      unsubscribe();
       if (interval) clearInterval(interval);
+      unsubscribe();
     };
-  }, [roomId, roundId]);
+  }, [roomId]);
 
   return timeLeft;
 }
