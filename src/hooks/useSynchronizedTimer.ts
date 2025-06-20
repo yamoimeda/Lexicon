@@ -60,9 +60,9 @@ export function useSynchronizedTimer(roomId: string) {
         debugInfo.endDate = end;
         debugInfo.now = Date.now();
         debugInfo.diff = end ? end.getTime() - Date.now() : null;
-        debugInfo.secondsLeft = end ? Math.max(0, Math.floor((end.getTime() - Date.now()) / 1000)) : null;
+        debugInfo.secondsLeft = end ? Math.max(0, Math.ceil((end.getTime() - Date.now()) / 1000)) : null;
         console.log('[TIMER][DEBUG]', debugInfo);
-        const update = () => setTimeLeft(end ? Math.max(0, Math.floor((end.getTime() - Date.now()) / 1000)) : null);
+        const update = () => setTimeLeft(end ? Math.max(0, Math.ceil((end.getTime() - Date.now()) / 1000)) : null);
         update();
         if (interval) clearInterval(interval);
         interval = setInterval(update, 1000);
