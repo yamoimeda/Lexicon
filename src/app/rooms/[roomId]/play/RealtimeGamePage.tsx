@@ -91,7 +91,7 @@ export default function RealtimeGamePage({ roomId }: RealtimeGamePageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Hook de timer sincronizado
-  const timeLeft = useSynchronizedTimer(roomId, currentRound?.id || currentRound);
+  const timeLeft = useSynchronizedTimer(roomId, currentRound?.roundNumber || currentRound);
 
   // Handler para enviar palabras
   const handleSubmitWords = useCallback(async () => {
